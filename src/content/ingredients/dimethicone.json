@@ -1,0 +1,9 @@
+{
+  "title": "ジメチコン", "englishName": "Dimethicone",
+  "summary": "シリコーンの一種。髪や肌を整える目的で、ヘアケア製品や化粧品に使われています。",
+  "category": "hair", "role": "コンディショニング", "tags": ["ヘアケア", "ジメチコン", "シリコーン"],
+  "status": "published", "updatedAt": "2026-10-07",
+  "sections": [{"heading": "どんな役割？", "body": "ジメチコンはシリコーン系の成分です。Cosmetic Ingredient Review の資料では、肌や髪のコンディショニングを主な用途として紹介しています。"}, {"heading": "髪に合う使い心地を考える", "body": "シリコーンという分類だけで、製品が自分に合うかは決まりません。髪の状態や、製品全体の使い心地を見ながら選びましょう。"}],
+  "caution": "成分の有無だけで、髪への良し悪しを一律に決めることはできません。製品に記載された使い方を確認してください。",
+  "sources": [{"title": "CIR — Amended Safety Assessment of Dimethicone, Methicone, and Substituted-Methicone Polymers", "url": "https://www.cir-safety.org/sites/default/files/methic122020revTAR.pdf", "kind": "official"}]
+}

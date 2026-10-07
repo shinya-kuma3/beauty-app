@@ -1,0 +1,12 @@
+---
+import Icon from './Icon.astro';
+import { pathTo, categoryLabel } from '../lib/content';
+import type { CollectionEntry } from 'astro:content';
+interface Props { entry: CollectionEntry<'ingredients'>; index?: number; }
+const { entry, index = 0 } = Astro.props;
+---
+<a class="ingredient-card" href={pathTo(`ingredients/${entry.id}/`)}>
+  <div class="ingredient-top"><span class:list={['ingredient-orb', `orb-${index % 3}`]}><Icon name={index % 3 === 1 ? 'sparkle' : 'drop'} size={28} /></span><span class="pill">{entry.data.role}</span></div>
+  <p class="english-name">{entry.data.englishName}</p><h3>{entry.data.title}</h3><p class="card-summary">{entry.data.summary}</p>
+  <div class="card-bottom"><span>{categoryLabel[entry.data.category]}</span><Icon name="arrow" size={19} /></div>
+</a>

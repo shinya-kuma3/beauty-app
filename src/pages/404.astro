@@ -1,0 +1,5 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { pathTo } from '../lib/content';
+---
+<Layout title="ページが見つかりません"><div class="shell section listing"><p class="eyebrow">404 / PAGE NOT FOUND</p><h1>ページが見つかりませんでした。</h1><p style="margin:20px 0 30px">移動または削除された可能性があります。成分図鑑や検索から探してみてください。</p><a class="button primary" href={pathTo()}>ホームへもどる →</a></div></Layout>

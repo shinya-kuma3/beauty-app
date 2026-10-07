@@ -1,0 +1,9 @@
+{
+  "title": "セラミド", "englishName": "Ceramides",
+  "summary": "肌のうるおいを考えるときに知っておきたい脂質。保湿クリームなどに配合されています。",
+  "category": "skin", "role": "保湿", "tags": ["保湿", "セラミド", "乾燥"],
+  "status": "published", "updatedAt": "2026-10-07",
+  "sections": [{"heading": "肌のうるおいとの関係", "body": "セラミドは脂質の一種です。米国皮膚科学会の保湿剤選びの案内でも、保湿に役立つ成分として紹介されています。"}, {"heading": "製品を見るときのヒント", "body": "成分表示にはセラミドNP、セラミドAPなど複数の名称があります。配合の有無に加え、クリームや乳液など製品の形や肌に合う使い心地も見てみましょう。"}],
+  "caution": "成分名や種類の数だけで、保湿力の順位を決めることはできません。",
+  "sources": [{"title": "AAD — How to pick the right moisturizer for your skin", "url": "https://www.aad.org/public/everyday-care/skin-care-basics/dry/pick-moisturizer", "kind": "guideline"}]
+}

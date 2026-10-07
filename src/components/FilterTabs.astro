@@ -1,0 +1,23 @@
+<div class="filter-bar" data-filter-root><div class="filters" aria-label="カテゴリで絞り込む">{[{ id: 'all', label: 'すべて' }, { id: 'skin', label: 'スキンケア' }, { id: 'hair', label: 'ヘアケア' }].map((item) => <button class="filter-button" type="button" data-category={item.id} aria-pressed={item.id === 'all' ? 'true' : 'false'}>{item.label}</button>)}</div><p class="result-count" aria-live="polite" data-count></p></div>
+<script>
+  const root = document.querySelector('[data-filter-root]');
+  if (root) {
+    const cards = [...document.querySelectorAll<HTMLElement>('[data-list-category]')];
+    const count = root.querySelector('[data-count]');
+    const empty = document.querySelector<HTMLElement>('[data-list-empty]');
+    function apply(category: string) {
+      let total = 0;
+      cards.forEach((card) => { card.hidden = category !== 'all' && card.dataset.listCategory !== category; if (!card.hidden) total++; });
+      root?.querySelectorAll<HTMLButtonElement>('[data-category]').forEach((button) => button.setAttribute('aria-pressed', String(button.dataset.category === category)));
+      if (count) count.textContent = `${total}件`;
+      if (empty) empty.hidden = total > 0;
+      const url = new URL(window.location.href);
+      if (category === 'all') url.searchParams.delete('category'); else url.searchParams.set('category', category);
+      history.replaceState(null, '', url);
+    }
+    root.querySelectorAll<HTMLButtonElement>('[data-category]').forEach((button) => button.addEventListener('click', () => apply(button.dataset.category || 'all')));
+    const category = new URLSearchParams(window.location.search).get('category') || 'all';
+    apply(['skin', 'hair'].includes(category) ? category : 'all');
+    window.addEventListener('popstate', () => apply(new URLSearchParams(window.location.search).get('category') || 'all'));
+  }
+</script>

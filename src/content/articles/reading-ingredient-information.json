@@ -1,0 +1,7 @@
+{
+  "title": "話題の成分を見つけたら、出典まで見てみよう", "summary": "SNS で目にした美容情報を、自分のケアにつなげる前に。情報を読むための3つの視点。",
+  "category": "skin", "tags": ["美容成分", "情報の読み方", "スキンケア"], "status": "published", "updatedAt": "2026-10-07", "readingMinutes": 2,
+  "relatedIngredients": ["niacinamide", "panthenol"],
+  "sections": [{"heading": "元の資料をたどる", "body": "投稿に成分の働きが紹介されていたら、元の研究や公式資料を探してみましょう。このサイトでは、成分や記事の最後に参考資料のリンクを載せています。"}, {"heading": "どんな条件だったかを見る", "body": "たとえばナイアシンアミドのレビューでは、皮膚へ届ける製剤の工夫や臨床の研究が扱われています。成分名だけでなく、製剤や研究条件にも注目してみましょう。"}, {"heading": "自分の製品と同じか考える", "body": "研究で使われた製剤と、手元の化粧品は同じとは限りません。SNS の体験談、研究の結果、製品の説明を区別しながら読むことが、選択の手がかりになります。"}],
+  "sources": [{"title": "Niacinamide: a review on dermal delivery strategies and clinical evidence (2024)", "url": "https://pubmed.ncbi.nlm.nih.gov/38722460/", "kind": "research"}]
+}
