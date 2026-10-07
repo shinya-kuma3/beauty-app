@@ -1,0 +1,49 @@
+{
+  "title": "指先のうるおいから始める、爪ケア。",
+  "summary": "手洗いやネイルのあとの乾燥に、爪まわりの保湿を。水仕事の工夫と、やさしいケアをまとめました。",
+  "category": "nail",
+  "tags": [
+    "爪ケア",
+    "指先",
+    "甘皮",
+    "保湿"
+  ],
+  "readingMinutes": 3,
+  "relatedIngredients": [
+    "petrolatum",
+    "glycerin"
+  ],
+  "sections": [
+    {
+      "heading": "手を洗ったあと、指先まで",
+      "body": "手を洗ったあとは、爪や甘皮のまわりにも保湿製品をなじませましょう。ワセリンなどの保護成分を使う選択肢もあります。"
+    },
+    {
+      "heading": "ネイルを休む時間も大切に",
+      "body": "ジェルネイルなどを無理にはがさず、適切な手順で落としてください。ネイルの合間には休む期間を設け、爪とそのまわりの保湿を続けます。"
+    },
+    {
+      "heading": "水仕事と爪の使い方を見直す",
+      "body": "長い水仕事では手袋を使う工夫を。甘皮を切りすぎたり、爪を道具のように使ったりしないようにします。変色・腫れ・痛みや長引く変化は皮膚科へ相談してください。"
+    }
+  ],
+  "sources": [
+    {
+      "title": "AAD — Gel manicures: Tips for healthy nails",
+      "url": "https://www.aad.org/public/everyday-care/nail-care-secrets/basics/pedicures/gel-manicures",
+      "kind": "guideline"
+    },
+    {
+      "title": "AAD — 11 dermatologists’ tips for healthy nails",
+      "url": "https://www.aad.org/public/everyday-care/nail-care-secrets/basics/healthy-nail-tips",
+      "kind": "guideline"
+    },
+    {
+      "title": "AAD — Tips on skin, hair and nails",
+      "url": "https://www.aad.org/news/national-healthy-skin-dermatologists-provide-tips-on-skin-hair-nails",
+      "kind": "guideline"
+    }
+  ],
+  "status": "published",
+  "updatedAt": "2026-10-07"
+}

@@ -5,7 +5,8 @@ import { z } from 'astro/zod';
 const common = {
   title: z.string().min(1).max(120),
   summary: z.string().min(1).max(300),
-  category: z.enum(['skin', 'hair']),
+  category: z.enum(['skin', 'hair', 'nail', 'body']),
+  areas: z.array(z.enum(['skin', 'hair', 'nail', 'body'])).min(1).optional(),
   tags: z.array(z.string().min(1)).min(1).max(8),
   status: z.enum(['draft', 'published']).default('draft'),
   updatedAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),

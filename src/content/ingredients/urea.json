@@ -1,0 +1,37 @@
+{
+  "title": "尿素",
+  "englishName": "Urea",
+  "summary": "乾燥した肌の保湿に使われる成分。濃度や配合によって使用感や用途が異なるため、ボディ用製品の説明を確かめて選びます。",
+  "category": "body",
+  "areas": [
+    "body",
+    "skin"
+  ],
+  "role": "保湿",
+  "tags": [
+    "尿素",
+    "保湿",
+    "ボディケア",
+    "乾燥"
+  ],
+  "sections": [
+    {
+      "heading": "乾燥ケアの候補",
+      "body": "AAD は、強い乾燥に対する保湿製品に用いられる成分のひとつとして尿素を挙げています。ケアに適した濃度や組み合わせは、肌の状態によって異なります。"
+    },
+    {
+      "heading": "製品の説明から選ぶ",
+      "body": "成分名だけで、顔や身体のどこにでも使えるとは判断できません。使用部位と使い方を確認し、刺激を感じるときは使用を中止してください。"
+    }
+  ],
+  "caution": "ひび割れ・傷・炎症がある部位では刺激を感じることがあります。強い乾燥やかゆみは、自己判断で濃度を上げず医療機関へ相談してください。",
+  "sources": [
+    {
+      "title": "AAD — Dry skin: Diagnosis and treatment",
+      "url": "https://www.aad.org/public/diseases/a-z/dry-skin-treatment",
+      "kind": "guideline"
+    }
+  ],
+  "status": "published",
+  "updatedAt": "2026-10-07"
+}

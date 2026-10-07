@@ -1,9 +1,40 @@
 {
-  "title": "ナイアシンアミド", "englishName": "Niacinamide",
+  "title": "ナイアシンアミド",
+  "englishName": "Niacinamide",
   "summary": "ビタミンB3の一種。肌を整える成分として、さまざまな化粧品に配合されています。",
-  "category": "skin", "role": "整肌", "tags": ["整肌", "ナイアシンアミド", "ビタミンB3"],
-  "status": "published", "updatedAt": "2026-10-07",
-  "sections": [{"heading": "どんな成分？", "body": "ナイアシンアミドは、ニコチンアミドとも呼ばれるビタミンB3の一種です。肌に塗布する製剤について、配合や使用条件を含めた研究が行われています。"}, {"heading": "研究を読むときの視点", "body": "研究で使われた濃度や製剤、対象者、期間によって結果は異なります。研究があることと、すべての市販製品が同じ働きを持つことは別に考えましょう。"}],
+  "category": "skin",
+  "role": "整肌",
+  "tags": [
+    "整肌",
+    "ナイアシンアミド",
+    "ビタミンB3"
+  ],
+  "status": "published",
+  "updatedAt": "2026-10-07",
+  "sections": [
+    {
+      "heading": "どんな成分？",
+      "body": "ナイアシンアミドは、ニコチンアミドとも呼ばれるビタミンB3の一種です。肌に塗布する製剤について、配合や使用条件を含めた研究が行われています。"
+    },
+    {
+      "heading": "研究を読むときの視点",
+      "body": "研究で使われた濃度や製剤、対象者、期間によって結果は異なります。研究があることと、すべての市販製品が同じ働きを持つことは別に考えましょう。"
+    }
+  ],
   "caution": "高い濃度ほど自分に合うとは限りません。使用方法は製品の表示を確認してください。",
-  "sources": [{"title": "Niacinamide: a review on dermal delivery strategies and clinical evidence (2024)", "url": "https://pubmed.ncbi.nlm.nih.gov/38722460/", "kind": "research"}, {"title": "Final report of the safety assessment of niacinamide and niacin", "url": "https://pubmed.ncbi.nlm.nih.gov/16596767/", "kind": "research"}]
+  "sources": [
+    {
+      "title": "Niacinamide: a review on dermal delivery strategies and clinical evidence (2024)",
+      "url": "https://pubmed.ncbi.nlm.nih.gov/38722460/",
+      "kind": "research"
+    },
+    {
+      "title": "Final report of the safety assessment of niacinamide and niacin",
+      "url": "https://pubmed.ncbi.nlm.nih.gov/16596767/",
+      "kind": "research"
+    }
+  ],
+  "areas": [
+    "skin"
+  ]
 }

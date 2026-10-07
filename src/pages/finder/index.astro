@@ -1,0 +1,85 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import Icon from '../../components/Icon.astro';
+import { pathTo } from '../../lib/content';
+import { careAreas } from '../../lib/finder.mjs';
+---
+<Layout title="あなたの成分パレット・成分診断" active="finder">
+  <div class="shell finder-page">
+    <header class="page-header"><div class="breadcrumb"><a href={pathTo()}>ホーム</a><span>/</span><span>成分診断</span></div><p class="eyebrow">YOUR INGREDIENT PALETTE</p><h1><span>いまの私に、</span><span>どんな成分？</span></h1><p>占いを楽しむように、3つの質問からケアのヒントを。<br />状態と、なりたい姿に合わせて、成分の候補を紹介します。</p></header>
+    <div class="finder-layout">
+      <aside class="finder-aside"><div class="palette-mark" aria-hidden="true"><Icon name="sparkle" size={46} /><span></span><span></span><span></span></div><h2>あなたのケアに、<br />小さな彩りを。</h2><p>正解を決めるためではなく、<br />自分で選ぶきっかけに。</p><small>約30秒 / 登録不要</small></aside>
+      <section class="finder-card" aria-label="成分診断の質問" data-finder data-result-base={pathTo('finder/result/')}>
+        <ol class="finder-steps" aria-label="診断の流れ"><li aria-current="step"><span>01</span>部位</li><li><span>02</span>状態</li><li><span>03</span>なりたい姿</li></ol>
+        <div class="finder-heading" tabindex="-1"><p class="eyebrow" id="question-step">QUESTION 01 / 03</p><h2 id="question-title">どこをケアしたい？</h2><p id="question-description">いま気になっている部位を、ひとつ選んでください。</p></div>
+        <form id="finder-form">
+          <fieldset class="finder-options" id="finder-options"><legend class="sr-only">どこをケアしたい？</legend>{careAreas.map(area => <label class="finder-option"><input type="radio" name="choice" value={area.id} required /><span class="option-icon"><Icon name={area.icon} size={28} /></span><span><small>{area.english}</small><strong>{area.label}</strong><em>{area.description}</em></span><span class="option-check" aria-hidden="true"></span></label>)}</fieldset>
+          <div class="finder-actions"><button class="text-link" id="finder-back" type="button" hidden>← 前の質問へ</button><button class="button primary" id="finder-next" type="submit" disabled>次の質問へ <Icon name="arrow" size={18} /></button></div>
+          <p class="finder-selection" id="finder-selection" role="status" aria-live="polite">部位を選ぶと次に進めます。</p>
+        </form>
+        <noscript><p class="empty-state">成分診断には JavaScript が必要です。<a href={pathTo('ingredients/')}>成分図鑑からも探せます。</a></p></noscript>
+      </section>
+    </div>
+    <p class="finder-note">一般的な美容情報に基づく成分選びのガイドです。肌質の判定や、症状の診断を行うものではありません。</p>
+  </div>
+</Layout>
+<script>
+  import { careAreas, matchCare } from '../../lib/finder.mjs';
+  const root = document.querySelector<HTMLElement>('[data-finder]')!;
+  const form = document.querySelector<HTMLFormElement>('#finder-form')!;
+  const options = document.querySelector<HTMLFieldSetElement>('#finder-options')!;
+  const heading = document.querySelector<HTMLElement>('.finder-heading')!;
+  const title = document.querySelector<HTMLElement>('#question-title')!;
+  const description = document.querySelector<HTMLElement>('#question-description')!;
+  const next = document.querySelector<HTMLButtonElement>('#finder-next')!;
+  const back = document.querySelector<HTMLButtonElement>('#finder-back')!;
+  const status = document.querySelector<HTMLElement>('#finder-selection')!;
+  const initialOptions = [...options.querySelectorAll<HTMLLabelElement>('label')].map(node => node.cloneNode(true));
+  let step = 0;
+  const answers = { area: '', state: '', goal: '' };
+  const titles = ['どこをケアしたい？', 'いまの状態に近いのは？', 'どんなケアを目指したい？'];
+  const keys = ['area', 'state', 'goal'] as const;
+  function render(focus = true) {
+    const area = careAreas.find(item => item.id === answers.area);
+    title.textContent = titles[step];
+    document.querySelector('#question-step')!.textContent = `QUESTION 0${step + 1} / 03`;
+    description.textContent = step === 0 ? 'いま気になっている部位を、ひとつ選んでください。' : `${area?.label}のケアについて、ひとつ選んでください。`;
+    options.replaceChildren();
+    const legend = document.createElement('legend'); legend.className = 'sr-only'; legend.textContent = titles[step]; options.append(legend);
+    if (step === 0) initialOptions.forEach(node => options.append(node.cloneNode(true)));
+    else {
+      const choices = step === 1 ? area!.states : area!.goals;
+      choices.forEach(item => {
+        const label = document.createElement('label'); label.className = 'finder-option';
+        const input = document.createElement('input'); input.type = 'radio'; input.name = 'choice'; input.value = item.id; input.required = true;
+        const text = document.createElement('span'); const strong = document.createElement('strong'); strong.textContent = item.label; const em = document.createElement('em'); em.textContent = item.description; text.append(strong, em);
+        const check = document.createElement('span'); check.className = 'option-check'; check.setAttribute('aria-hidden', 'true'); label.append(input, text, check); options.append(label);
+      });
+    }
+    options.querySelectorAll<HTMLInputElement>('input').forEach(input => { input.checked = input.value === answers[keys[step]]; });
+    root.querySelectorAll('.finder-steps li').forEach((node, index) => { node.classList.toggle('step-done', index < step); if (index === step) node.setAttribute('aria-current', 'step'); else node.removeAttribute('aria-current'); });
+    back.hidden = step === 0;
+    next.firstChild!.textContent = step === 2 ? '成分パレットを見る ' : '次の質問へ ';
+    updateSelection();
+    if (focus) heading.focus({ preventScroll: true });
+  }
+  function updateSelection() {
+    const selected = options.querySelector<HTMLInputElement>('input:checked');
+    next.disabled = !selected;
+    status.textContent = selected ? `${selected.closest('label')?.querySelector('strong')?.textContent}を選択しました。` : 'ひとつ選ぶと次に進めます。';
+  }
+  form.addEventListener('change', updateSelection);
+  form.addEventListener('submit', event => {
+    event.preventDefault();
+    const selected = options.querySelector<HTMLInputElement>('input:checked'); if (!selected) return;
+    const key = keys[step];
+    if (answers[key] !== selected.value) { if (step === 0) answers.state = ''; if (step <= 1) answers.goal = ''; }
+    answers[key] = selected.value;
+    if (step < 2) { step++; render(); }
+    else { const result = matchCare(answers.area, answers.state, answers.goal); if (result) window.location.assign(`${root.dataset.resultBase}${result.slug}/`); }
+  });
+  back.addEventListener('click', () => { if (step > 0) { step--; render(); } });
+  const prefill = new URLSearchParams(location.search).get('area');
+  if (careAreas.some(area => area.id === prefill)) { answers.area = prefill!; }
+  render(false);
+</script>

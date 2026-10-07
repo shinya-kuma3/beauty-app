@@ -1,0 +1,40 @@
+{
+  "title": "メンズケアは、洗う・保湿・紫外線対策から。",
+  "summary": "ケアを始めたいけれど、何を選べばいい？ 肌質やシェービングの習慣に合わせて、続けやすい基本を整理します。",
+  "category": "skin",
+  "tags": [
+    "メンズケア",
+    "シェービング",
+    "保湿",
+    "紫外線対策"
+  ],
+  "readingMinutes": 3,
+  "relatedIngredients": [
+    "glycerin",
+    "ceramide",
+    "hyaluronic-acid"
+  ],
+  "sections": [
+    {
+      "heading": "自分の肌質を手がかりに",
+      "body": "男性向けという表示だけで選ぶ必要はありません。乾燥しやすい、皮脂が気になる、刺激を感じやすいなど、自分の肌に合う使用感を確かめましょう。"
+    },
+    {
+      "heading": "シェービングは摩擦を少なく",
+      "body": "肌と毛を湿らせ、シェービング用の製品を使い、毛の流れに沿って剃ります。何度も同じ場所を剃ることを避け、剃ったあとの乾燥には保湿を。痛みや炎症が続く場合は相談してください。"
+    },
+    {
+      "heading": "少ない手順で、毎日に",
+      "body": "やさしく洗う、保湿する、日中は紫外線を防ぐ。この基本から始めて、製品を一度に増やしすぎないようにします。皮脂が気になる肌でも、乾燥の有無や製品の使用感を見て保湿を考えましょう。"
+    }
+  ],
+  "sources": [
+    {
+      "title": "AAD — Skin care tips for men",
+      "url": "https://www.aad.org/public/everyday-care/skin-care-basics/care/skin-care-for-men",
+      "kind": "guideline"
+    }
+  ],
+  "status": "published",
+  "updatedAt": "2026-10-07"
+}

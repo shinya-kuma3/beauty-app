@@ -1,6 +1,6 @@
 ---
 import Icon from './Icon.astro';
-import { pathTo, categoryLabel } from '../lib/content';
+import { mainPathTo as pathTo, categoryLabel } from '../lib/content';
 import type { CollectionEntry } from 'astro:content';
 interface Props { entry: CollectionEntry<'ingredients'>; index?: number; }
 const { entry, index = 0 } = Astro.props;

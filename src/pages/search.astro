@@ -3,7 +3,7 @@ import Layout from '../layouts/Layout.astro';
 import Icon from '../components/Icon.astro';
 import { pathTo } from '../lib/content';
 ---
-<Layout title="成分・ケア記事を検索" active="search"><div class="shell search-page"><header class="page-header"><div class="breadcrumb"><a href={pathTo()}>ホーム</a><span>/</span><span>検索</span></div><p class="eyebrow">FIND YOUR CARE</p><h1><span>気になることから、</span><span>探してみる。</span></h1><p>成分名、英語名、本文のキーワードから検索できます。</p></header><form class="search-form" id="search-form"><Icon name="search" size={22} /><label class="sr-only" for="query">検索キーワード</label><input id="query" type="search" name="q" placeholder="例：保湿、セラミド、髪" autocomplete="off" /><button type="submit">検索<Icon name="arrow" size={18} /></button></form><div class="search-controls"><label for="category">カテゴリ<select id="category"><option value="all">すべて</option><option value="skin">スキンケア</option><option value="hair">ヘアケア</option></select></label><label for="type">コンテンツ<select id="type"><option value="all">すべて</option><option value="ingredient">成分図鑑</option><option value="article">ケア記事</option></select></label></div><div class="filter-bar"><p id="search-status" class="result-count" role="status" aria-live="polite">検索データを読み込んでいます…</p><button class="filter-button" id="reset" type="button">条件をクリア</button></div><div id="search-results" class="search-result-grid" data-index={pathTo('search-index.json')} aria-busy="true"></div><noscript><p class="empty-state">キーワード検索には JavaScript が必要です。<a href={pathTo('ingredients/')}>成分図鑑</a>・<a href={pathTo('articles/')}>ケア記事</a>はそのままご覧いただけます。</p></noscript></div></Layout>
+<Layout title="成分・ケア記事を検索" active="search"><div class="shell search-page"><header class="page-header"><div class="breadcrumb"><a href={pathTo()}>ホーム</a><span>/</span><span>検索</span></div><p class="eyebrow">FIND YOUR CARE</p><h1><span>気になることから、</span><span>探してみる。</span></h1><p>成分名、英語名、本文のキーワードから検索できます。</p></header><form class="search-form" id="search-form"><Icon name="search" size={22} /><label class="sr-only" for="query">検索キーワード</label><input id="query" type="search" name="q" placeholder="例：保湿、セラミド、髪" autocomplete="off" /><button type="submit">検索<Icon name="arrow" size={18} /></button></form><div class="search-controls"><label for="category">カテゴリ<select id="category"><option value="all">すべて</option><option value="skin">スキンケア</option><option value="hair">ヘアケア</option><option value="nail">爪ケア</option><option value="body">ボディケア</option></select></label><label for="type">コンテンツ<select id="type"><option value="all">すべて</option><option value="ingredient">成分図鑑</option><option value="article">ケア記事</option></select></label></div><div class="filter-bar"><p id="search-status" class="result-count" role="status" aria-live="polite">検索データを読み込んでいます…</p><button class="filter-button" id="reset" type="button">条件をクリア</button></div><div id="search-results" class="search-result-grid" data-index={pathTo('search-index.json')} aria-busy="true"></div><noscript><p class="empty-state">キーワード検索には JavaScript が必要です。<a href={pathTo('ingredients/')}>成分図鑑</a>・<a href={pathTo('articles/')}>ケア記事</a>はそのままご覧いただけます。</p></noscript></div></Layout>
 <script>
   import { filterEntries } from '../lib/search.mjs';
   interface SearchEntry { title: string; summary: string; category: string; type: string; tags: string[]; url: string; updatedAt: string; englishName?: string; sections: { heading: string; body: string }[]; }
@@ -18,7 +18,7 @@ import { pathTo } from '../lib/content';
   function restore() {
     const params = new URLSearchParams(location.search);
     query.value = params.get('q') || '';
-    category.value = ['skin', 'hair'].includes(params.get('category') || '') ? params.get('category')! : 'all';
+    category.value = ['skin', 'hair', 'nail', 'body'].includes(params.get('category') || '') ? params.get('category')! : 'all';
     type.value = ['ingredient', 'article'].includes(params.get('type') || '') ? params.get('type')! : 'all';
   }
   function element(tag: string, className: string, text = '') { const node = document.createElement(tag); node.className = className; node.textContent = text; return node; }
@@ -29,7 +29,7 @@ import { pathTo } from '../lib/content';
     status.textContent = query.value.trim() ? `「${query.value.trim()}」の検索結果：${found.length}件` : `${found.length}件の成分・記事`;
     found.forEach((entry) => {
       const card = document.createElement('a'); card.href = entry.url; card.className = 'search-result';
-      const meta = element('div', 'search-meta'); meta.append(element('span', '', entry.type === 'ingredient' ? '成分図鑑' : 'ケア記事'), element('span', '', entry.category === 'skin' ? 'スキンケア' : 'ヘアケア'));
+      const meta = element('div', 'search-meta'); meta.append(element('span', '', entry.type === 'ingredient' ? '成分図鑑' : 'ケア記事'), element('span', '', ({ skin: 'スキンケア', hair: 'ヘアケア', nail: '爪ケア', body: 'ボディケア' } as Record<string, string>)[entry.category]));
       card.append(meta, element('h2', '', entry.title), element('p', '', entry.summary));
       const tags = element('div', 'result-tags'); entry.tags.forEach((tag) => tags.append(element('span', '', `# ${tag}`))); card.append(tags);
       const bottom = element('div', 'card-bottom'); bottom.append(element('span', '', entry.updatedAt.replaceAll('-', '.')), element('span', '', '読む →')); card.append(bottom); results.append(card);

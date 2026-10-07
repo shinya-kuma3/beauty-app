@@ -1,0 +1,7 @@
+---
+import MensHome from '../components/MensHome.astro';
+import { mensSiteUrl } from '../lib/content';
+// Keep the old URL as a redirect for bookmarks and existing links.
+if (mensSiteUrl) return Astro.redirect(mensSiteUrl, 301);
+---
+<MensHome />

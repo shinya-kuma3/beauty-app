@@ -1,0 +1,46 @@
+{
+  "title": "お風呂のあとに、ボディの保湿習慣を。",
+  "summary": "身体の乾燥が気になるときは、洗い方と保湿のタイミングから。無理なく続けるボディケアの基本です。",
+  "category": "body",
+  "tags": [
+    "ボディケア",
+    "保湿",
+    "入浴",
+    "乾燥"
+  ],
+  "readingMinutes": 3,
+  "relatedIngredients": [
+    "glycerin",
+    "ceramide",
+    "petrolatum",
+    "urea"
+  ],
+  "sections": [
+    {
+      "heading": "洗いすぎず、やさしく",
+      "body": "熱いお湯や長い入浴を避け、こすりすぎない洗い方を意識しましょう。乾燥が気になるときは、香料のない洗浄料も選択肢です。"
+    },
+    {
+      "heading": "水分が残るうちに保湿する",
+      "body": "入浴後はタオルで押さえるように水分を取り、肌に少し水分が残るうちに保湿製品を使います。グリセリンなど水分を保つ成分と、ワセリンなど水分が逃げるのを抑える成分は役割が異なります。"
+    },
+    {
+      "heading": "日常のケアで改善しないとき",
+      "body": "強いかゆみ・赤み・ひび割れが続くときは、原因の確認が必要なことがあります。製品を足し続けず、皮膚科へ相談しましょう。"
+    }
+  ],
+  "sources": [
+    {
+      "title": "AAD — Dermatologists’ tips for relieving dry skin",
+      "url": "https://www.aad.org/public/everyday-care/skin-care-basics/dry/dermatologists-tips-relieve-dry-skin",
+      "kind": "guideline"
+    },
+    {
+      "title": "AAD — How to pick the right moisturizer",
+      "url": "https://www.aad.org/public/everyday-care/skin-care-basics/dry/pick-moisturizer",
+      "kind": "guideline"
+    }
+  ],
+  "status": "published",
+  "updatedAt": "2026-10-07"
+}

@@ -1,4 +1,4 @@
-<div class="filter-bar" data-filter-root><div class="filters" aria-label="カテゴリで絞り込む">{[{ id: 'all', label: 'すべて' }, { id: 'skin', label: 'スキンケア' }, { id: 'hair', label: 'ヘアケア' }].map((item) => <button class="filter-button" type="button" data-category={item.id} aria-pressed={item.id === 'all' ? 'true' : 'false'}>{item.label}</button>)}</div><p class="result-count" aria-live="polite" data-count></p></div>
+<div class="filter-bar" data-filter-root><div class="filters" aria-label="カテゴリで絞り込む">{[{ id: 'all', label: 'すべて' }, { id: 'skin', label: 'スキンケア' }, { id: 'hair', label: 'ヘアケア' }, { id: 'nail', label: '爪ケア' }, { id: 'body', label: 'ボディケア' }].map((item) => <button class="filter-button" type="button" data-category={item.id} aria-pressed={item.id === 'all' ? 'true' : 'false'}>{item.label}</button>)}</div><p class="result-count" aria-live="polite" data-count></p></div>
 <script>
   const root = document.querySelector('[data-filter-root]');
   if (root) {
@@ -7,7 +7,7 @@
     const empty = document.querySelector<HTMLElement>('[data-list-empty]');
     function apply(category: string) {
       let total = 0;
-      cards.forEach((card) => { card.hidden = category !== 'all' && card.dataset.listCategory !== category; if (!card.hidden) total++; });
+      cards.forEach((card) => { card.hidden = category !== 'all' && !card.dataset.listCategory?.split(' ').includes(category); if (!card.hidden) total++; });
       root?.querySelectorAll<HTMLButtonElement>('[data-category]').forEach((button) => button.setAttribute('aria-pressed', String(button.dataset.category === category)));
       if (count) count.textContent = `${total}件`;
       if (empty) empty.hidden = total > 0;
@@ -17,7 +17,7 @@
     }
     root.querySelectorAll<HTMLButtonElement>('[data-category]').forEach((button) => button.addEventListener('click', () => apply(button.dataset.category || 'all')));
     const category = new URLSearchParams(window.location.search).get('category') || 'all';
-    apply(['skin', 'hair'].includes(category) ? category : 'all');
+    apply(['skin', 'hair', 'nail', 'body'].includes(category) ? category : 'all');
     window.addEventListener('popstate', () => apply(new URLSearchParams(window.location.search).get('category') || 'all'));
   }
 </script>

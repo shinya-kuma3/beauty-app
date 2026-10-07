@@ -1,9 +1,47 @@
 {
-  "title": "グリセリン", "englishName": "Glycerin / Glycerol",
+  "title": "グリセリン",
+  "englishName": "Glycerin / Glycerol",
   "summary": "肌の水分を保つための保湿成分。化粧水やクリームなど、日々のケアで広く使われています。",
-  "category": "skin", "role": "保湿", "tags": ["保湿", "グリセリン", "乾燥"],
-  "status": "published", "updatedAt": "2026-10-07",
-  "sections": [{"heading": "うるおいを支える成分", "body": "グリセリンはグリセロールとも呼ばれます。角層の水分や皮膚のバリアとの関係について研究されている保湿成分です。"}, {"heading": "使い心地と配合", "body": "同じ成分が入っていても、他の成分との組み合わせで製品の使い心地は変わります。成分表だけで決めず、製品の使用感も選ぶときの参考にしましょう。"}],
+  "category": "skin",
+  "role": "保湿",
+  "tags": [
+    "保湿",
+    "グリセリン",
+    "乾燥"
+  ],
+  "status": "published",
+  "updatedAt": "2026-10-07",
+  "sections": [
+    {
+      "heading": "うるおいを支える成分",
+      "body": "グリセリンはグリセロールとも呼ばれます。角層の水分や皮膚のバリアとの関係について研究されている保湿成分です。"
+    },
+    {
+      "heading": "使い心地と配合",
+      "body": "同じ成分が入っていても、他の成分との組み合わせで製品の使い心地は変わります。成分表だけで決めず、製品の使用感も選ぶときの参考にしましょう。"
+    },
+    {
+      "heading": "ヘアケアやハンドケアでの使われ方",
+      "body": "グリセリンは保湿成分として、ハンドケアやヘアケアにも使われます。CIR の資料では、ヘアコンディショニング用途も報告されています。使用感は配合や組み合わせによって異なります。"
+    }
+  ],
   "caution": "ひとつの配合成分から、すべての肌質への適性を判断することはできません。",
-  "sources": [{"title": "Glycerol and the skin: holistic approach to its origin and functions", "url": "https://pubmed.ncbi.nlm.nih.gov/18510666/", "kind": "research"}]
+  "sources": [
+    {
+      "title": "Glycerol and the skin: holistic approach to its origin and functions",
+      "url": "https://pubmed.ncbi.nlm.nih.gov/18510666/",
+      "kind": "research"
+    },
+    {
+      "title": "CIR — Safety Assessment of Glycerin as Used in Cosmetics",
+      "url": "https://www.cir-safety.org/sites/default/files/glycer_122014_FR.pdf",
+      "kind": "official"
+    }
+  ],
+  "areas": [
+    "skin",
+    "body",
+    "nail",
+    "hair"
+  ]
 }

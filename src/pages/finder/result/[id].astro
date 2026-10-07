@@ -1,0 +1,24 @@
+---
+import Layout from '../../../layouts/Layout.astro';
+import IngredientCard from '../../../components/IngredientCard.astro';
+import Icon from '../../../components/Icon.astro';
+import { allMatches } from '../../../lib/finder.mjs';
+import { pathTo, publishedIngredients } from '../../../lib/content';
+export function getStaticPaths() { return allMatches().map(match => ({ params: { id: match.slug }, props: { match } })); }
+const { match } = Astro.props;
+const ingredients = await publishedIngredients();
+const recommendations = match.recommendations.map(recommendation => {
+  const entry = ingredients.find(item => item.id === recommendation.id);
+  if (!entry) throw new Error(`Unavailable recommendation: ${recommendation.id}`);
+  return { entry, reason: recommendation.reason };
+});
+---
+<Layout title={`${match.area.label}のおすすめ成分パレット`} active="finder">
+  <div class="shell finder-result-page">
+    <header class="page-header result-header"><div class="breadcrumb"><a href={pathTo()}>ホーム</a><span>/</span><a href={pathTo('finder/')}>成分診断</a><span>/</span><span>あなたのパレット</span></div><span class="result-symbol" aria-hidden="true"><Icon name="sparkle" size={32} /></span><p class="eyebrow">YOUR INGREDIENT PALETTE</p><h1><span>あなたの{match.area.label}に、</span><span>この成分をヒントに。</span></h1><p>いまの状態と、なりたい姿からピックアップしました。</p><div class="answer-summary"><span>{match.area.label}</span><span>{match.state.label}</span><span>{match.goal.label}</span></div></header>
+    <section aria-label="おすすめ成分"><div class:list={['ingredient-grid', { 'two-results': recommendations.length === 2 }]}>{recommendations.map(({ entry, reason }, index) => <div class="recommendation"><p class="recommendation-label">PALETTE 0{index + 1}</p><IngredientCard entry={entry} index={index} /><div class="recommendation-reason"><h2>おすすめの理由</h2><p>{reason}</p></div></div>)}</div></section>
+    <section class="result-next"><div><p class="eyebrow">YOUR NEXT STEP</p><h2>成分を知ったら、ケアの習慣へ。</h2><p>{match.area.tips}</p></div><a class="button primary" href={pathTo(`articles/${match.area.article}/`)}>{match.area.label}のケア記事を読む<Icon name="arrow" size={18} /></a></section>
+    <aside class="detail-note"><h2>選ぶときのヒント</h2><p>選択内容と成分の一般的な役割を照らし合わせたガイドです。相性や効果を保証するものではありません。成分そのものを肌に使うのではなく、使用部位と使い方が表示された製品を選びましょう。各成分の詳しい説明で、出典と補足を確認できます。</p></aside>
+    <div class="result-actions"><a class="button" href={pathTo('finder/')}>もう一度、成分診断をする</a><a class="text-link" href={`${pathTo('ingredients/')}?category=${match.area.id}`}>{match.area.label}の成分をもっと見る →</a></div>
+  </div>
+</Layout>

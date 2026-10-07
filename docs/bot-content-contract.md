@@ -19,7 +19,8 @@ X で美容成分やケアの話題を見つける → 元の公式資料・研�
 | --- | --- |
 | title | 日本語の成分名・記事タイトル（120字以内） |
 | summary | 一覧や検索に使う説明（300字以内） |
-| category | `skin` / `hair` |
+| category | 主カテゴリ: `skin` / `hair` / `nail` / `body` |
+| areas | 任意。複数カテゴリで使う成分の対象配列。主カテゴリも含める |
 | tags | 検索キーワードの配列（1〜8件） |
 | status | `draft` / `published`（未指定は下書き） |
 | updatedAt | 実在する `YYYY-MM-DD` の更新日 |
@@ -64,4 +65,10 @@ sources の kind は `guideline`（専門団体）、`research`（研究）、`o
 
 ## 未決定の接続項目
 
-GitHub リポジトリ、公開先、X の情報取得方法、Grok bot の実行場所、取得頻度、公開前の確認方法。API キーや GitHub トークンをコンテンツファイルへ保存しないでください。
+GitHub リポジトリは `git@github.com:shinya-kuma3/beauty-app.git`。公開先は Cloudflare Pages、本体は `my-beauty-palette.com`、メンズは `mens.my-beauty-palette.com` を予定しています。Cloudflare アカウント・DNS の接続、X の情報取得方法、Grok bot の実行場所、取得頻度、公開前の確認方法は未設定です。API キーや GitHub トークンをコンテンツファイルへ保存しないでください。
+
+## 成分診断との関係
+
+成分診断は `src/lib/finder.mjs` の部位・状態・目標と編集済みのおすすめ理由から、2〜3成分を表示します。結果は36通りの静的ページです。乱数や医療的な判定は使いません。候補の順序は状態と目標の両方から決まり、各成分の役割・出典は共通の成分詳細で管理します。
+
+新しい JSON 成分を追加しても、診断の候補には自動追加されません。診断の候補を変える際は、対象部位・根拠・理由も確認してから `finder.mjs` を編集してください。公開済み候補を削除・下書き化すると、テストとビルドが失敗するため、診断側の参照も一緒に変更します。

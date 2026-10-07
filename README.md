@@ -1,6 +1,8 @@
-# beauty-app / beauty note
+# beauty-app / my beauty palette
 
-肌と髪の成分図鑑・ケア記事・検索を提供する日本語の美容ライブラリです。白と清潔感のある青を中心に、スマートフォンと PC に対応しています。
+肌・髪・爪・身体の成分図鑑とケア記事に、濃い青のメンズケア入口 `mens.my-beauty-palette.com` と3問の成分診断 `/finder/` を用意しています。診断結果は36通りの静的ページとして生成し、共通の成分詳細・ケア記事へつなぎます。おすすめは一般的な美容情報に基づく編集ガイドです。
+
+成分図鑑・ケア記事・検索を提供する日本語の美容ライブラリです。白と清潔感のある青を中心に、スマートフォンと PC に対応しています。
 
 ## 基盤
 
@@ -17,6 +19,8 @@ npm run dev
 
 ローカル URL: http://127.0.0.1:4325/
 
+ローカルではメンズボタンから同じポートの `/mens/` を開きます。別サーバーは不要で、ポートが変わっても移動できます。ポートを指定する場合は `npm run dev -- --port 4335`。独立したメンズサイトの確認には、別のターミナルで `npm run dev:mens`（標準ポート 4326）も起動できます。
+
 ```sh
 npm run check
 npm test
@@ -25,7 +29,11 @@ npm run test:build
 npm run preview
 ```
 
-`dist/` が公開成果物です。静的サイト対応のホスティングで利用できます。公開先はまだ接続していません。
+`dist/` が総合サイトの公開成果物です。`npm run build:mens` はメンズ用の `dist-mens/` を生成します。公開ドメインは `site.config.mjs` に設定済みで、本体は `my-beauty-palette.com`、メンズは `mens.my-beauty-palette.com` です。Cloudflare のアカウント・DNS はまだ接続していません。
+
+公開用ビルド後の `npm run preview` は公開ドメインへのリンクを含みます。ローカルで総合・メンズを確認する場合は、`npm run build:local` を使ってからプレビューします。
+
+髪・爪のアイコンは `src/assets/icons/hair.svg` と `src/assets/icons/nail.svg` を直接編集できます。サイトでもこのファイルを読み込み、色は各表示場所の文字色を継承します。
 
 ## ページ
 
@@ -49,14 +57,14 @@ Grok bot を接続するための契約は [docs/bot-content-contract.md](docs/b
 
 ## GitHub と公開
 
-`.github/workflows/ci.yml` は push / PR の検証用です。デプロイは行いません。GitHub リポジトリと公開先を決めたあと、main ブランチの更新で `npm run build` → `dist/` のデプロイを接続してください。
+`.github/workflows/ci.yml` は push / PR の検証用です。本体とメンズの生成結果・リンク・リダイレクトを検証し、デプロイは行いません。Cloudflare Pages の2プロジェクトを同じリポジトリに接続して、main の更新時に各ビルドを実行する構成です。
 
-ドメインが決まったら `SITE_URL` を設定すると canonical URL を出力します。GitHub Pages のプロジェクト公開などでサブパスが必要な場合は、ビルド環境で `BASE_PATH=/beauty-app/` を指定します。プレビューと本番で同じ設定を使ってください。
+Cloudflare への入力値と接続手順は [docs/cloudflare-deployment.md](docs/cloudflare-deployment.md) にまとめています。`PUBLIC_MAIN_SITE_URL` / `PUBLIC_MENS_SITE_URL` で公開 URL を上書きできます。本体の旧 `/mens/` はメンズのトップへ転送します。
 
 X / Grok API の接続・スケジュール実行・GitHub への push は、今回のアプリには含めていません。API キーは bot 実行環境のシークレットとして管理します。
 
 ## 初期コンテンツ
 
-成分6件、記事3件。出典を確認して作成した基本情報であり、X の最新投稿を取り込んだものではありません。各ページに参考資料と更新日を表示します。本文はプレーンテキストとして表示し、コンテンツ内の HTML やスクリプトは実行しません。
+成分8件、記事6件。出典を確認して作成した基本情報であり、X の最新投稿を取り込んだものではありません。各ページに参考資料と更新日を表示します。本文はプレーンテキストとして表示し、コンテンツ内の HTML やスクリプトは実行しません。
 
 文字表示に Google Fonts を利用しています。通信できない場合は端末の日本語フォントへフォールバックします。

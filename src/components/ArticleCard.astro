@@ -1,8 +1,8 @@
 ---
-import { pathTo, categoryLabel, formatDate } from '../lib/content';
+import { mainPathTo as pathTo, categoryLabel, formatDate } from '../lib/content';
 import Icon from './Icon.astro';
 import type { CollectionEntry } from 'astro:content';
 interface Props { entry: CollectionEntry<'articles'>; index?: number; }
 const { entry, index = 0 } = Astro.props;
 ---
-<a class="article-card" href={pathTo(`articles/${entry.id}/`)}><div class:list={['article-art', `art-${index % 3}`]} aria-hidden="true"><div class="art-disc"></div><div class="art-bottle"></div><span>{entry.data.category === 'hair' ? 'HAIR & SCALP' : 'SKIN & CARE'}</span><Icon name={entry.data.category === 'hair' ? 'hair' : 'drop'} size={52} /></div><div class="article-body"><div class="article-meta"><span>{categoryLabel[entry.data.category]}</span><span>{entry.data.readingMinutes}分で読む</span></div><h3>{entry.data.title}</h3><p class="card-summary">{entry.data.summary}</p><div class="card-bottom"><time datetime={entry.data.updatedAt}>{formatDate(entry.data.updatedAt)}</time><Icon name="arrow" size={19} /></div></div></a>
+<a class="article-card" href={pathTo(`articles/${entry.id}/`)}><div class:list={['article-art', `art-${index % 3}`]} aria-hidden="true"><div class="art-disc"></div><div class="art-bottle"></div><span>{({ skin: 'SKIN & CARE', hair: 'HAIR & SCALP', nail: 'NAIL & HAND', body: 'BODY & CARE' })[entry.data.category]}</span><Icon name={({ skin: 'face', hair: 'hair', nail: 'nail', body: 'body' })[entry.data.category]} size={52} /></div><div class="article-body"><div class="article-meta"><span>{categoryLabel[entry.data.category]}</span><span>{entry.data.readingMinutes}分で読む</span></div><h3>{entry.data.title}</h3><p class="card-summary">{entry.data.summary}</p><div class="card-bottom"><time datetime={entry.data.updatedAt}>{formatDate(entry.data.updatedAt)}</time><Icon name="arrow" size={19} /></div></div></a>

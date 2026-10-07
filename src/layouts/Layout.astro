@@ -1,31 +1,43 @@
 ---
 import '../styles/global.css';
 import Icon from '../components/Icon.astro';
-import { pathTo } from '../lib/content';
-interface Props { title?: string; description?: string; active?: string; }
-const { title = '肌と髪のための、やさしい美容ノート', description = '美容成分を知る。日々のケアを見つける。肌と髪の情報を、出典とともに読みやすくまとめた美容ライブラリ。', active = 'home' } = Astro.props;
-const nav = [{ label: 'ホーム', path: '', id: 'home' }, { label: '成分図鑑', path: 'ingredients/', id: 'ingredients' }, { label: 'ケア記事', path: 'articles/', id: 'articles' }];
+import { pathTo, mainPathTo, mensPathTo, isMensSite } from '../lib/content';
+interface Props { title?: string; description?: string; active?: string; theme?: 'default' | 'mens'; }
+const { title = '私らしいケアの彩りを', description = '肌・髪・爪・身体の美容ライブラリ。成分図鑑、ケア記事と成分診断から、自分に合うケアのヒントを。', active = 'home', theme = 'default' } = Astro.props;
+const nav = [{ label: 'ホーム', path: '', id: 'home' }, { label: '成分図鑑', path: 'ingredients/', id: 'ingredients' }, { label: 'ケア記事', path: 'articles/', id: 'articles' }, { label: '成分診断', path: 'finder/', id: 'finder' }];
 const canonical = Astro.site ? new URL(Astro.url.pathname, Astro.site).href : undefined;
+const isMensView = isMensSite || active === 'mens';
 ---
 <!doctype html>
 <html lang="ja">
   <head>
     <meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>{title} | beauty note</title><meta name="description" content={description} />
-    <meta name="theme-color" content="#edf6fc" />
+    <title>{title} | my beauty palette</title><meta name="description" content={description} />
+    <meta name="theme-color" content={theme === 'mens' ? '#173b60' : '#edf6fc'} />
     <link rel="icon" type="image/svg+xml" href={pathTo('favicon.svg')} />
     {canonical && <link rel="canonical" href={canonical} />}
-    <meta property="og:title" content={`${title} | beauty note`} /><meta property="og:description" content={description} /><meta property="og:type" content="website" />
+    <meta property="og:title" content={`${title} | my beauty palette`} /><meta property="og:description" content={description} /><meta property="og:type" content="website" />
     {canonical && <meta property="og:url" content={canonical} />}
   </head>
-  <body>
+  <body class:list={{ 'mens-theme': theme === 'mens' }}>
     <a class="skip-link" href="#main">本文へ移動</a>
     <header class="header"><div class="shell header-inner">
-      <a class="brand" href={pathTo()} aria-label="beauty note ホーム"><span class="brand-symbol"><Icon name="drop" size={23} /></span><span>beauty<span class="brand-note">note</span><small>肌と髪の、美容ライブラリ</small></span></a>
-      <nav aria-label="メインナビゲーション">{nav.map((item) => <a class:list={{ active: active === item.id }} href={pathTo(item.path)} aria-current={active === item.id ? 'page' : undefined}>{item.label}</a>)}</nav>
-      <a class="header-search" href={pathTo('search/')} aria-label="成分や記事を検索"><Icon name="search" size={20} /><span>検索する</span></a>
+      <a class="brand" href={pathTo()} aria-label="my beauty palette ホーム"><span class="brand-symbol"><Icon name="drop" size={23} /></span><span>my beauty <span class="brand-note">palette</span><small>肌・髪・爪・身体の、美容ライブラリ</small></span></a>
+      <nav aria-label="メインナビゲーション">{nav.map((item) => <a class:list={{ active: active === item.id }} href={isMensSite && item.id === 'home' ? pathTo() : mainPathTo(item.path)} aria-current={active === item.id ? 'page' : undefined}>{item.label}</a>)}</nav>
+      <div class="header-actions"><a class="header-search" href={mainPathTo('search/')} aria-label="成分や記事を検索"><Icon name="search" size={20} /></a><a class:list={['mens-button', { 'main-site-button': isMensView }]} href={isMensView ? mainPathTo() : mensPathTo()}>{isMensView ? '総合トップ' : 'メンズケア'}<Icon name="arrow" size={15} /></a></div>
     </div></header>
     <main id="main"><slot /></main>
-    <footer class="footer"><div class="shell footer-top"><div><a class="brand footer-brand" href={pathTo()}>beauty<span class="brand-note">note</span></a><p>知ることから、心地よいケアへ。</p></div><div class="footer-links"><a href={pathTo('ingredients/')}>成分図鑑</a><a href={pathTo('articles/')}>ケア記事</a><a href={pathTo('about/')}>このサイトについて</a></div></div><div class="shell footer-bottom"><span>© {new Date().getFullYear()} beauty note</span><span>肌と髪のための、小さな知識の積み重ね。</span></div></footer>
+    <footer class="footer"><div class="shell footer-top"><div><a class="brand footer-brand" href={pathTo()}>my beauty <span class="brand-note">palette</span></a><p>知ることから、心地よいケアへ。</p></div><div class="footer-links"><a href={mainPathTo('ingredients/')}>成分図鑑</a><a href={mainPathTo('finder/')}>成分診断</a><a href={mensPathTo()}>メンズケア</a><a href={mainPathTo('about/')}>このサイトについて</a></div></div><div class="shell footer-bottom"><span>© {new Date().getFullYear()} my beauty palette</span><span>自分をいたわる、小さな知識の積み重ね。</span></div></footer>
   </body>
 </html>
+<script>
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (!reducedMotion && 'IntersectionObserver' in window) {
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) { entry.target.classList.add('is-visible'); observer.unobserve(entry.target); }
+      });
+    }, { threshold: 0.08 });
+    document.querySelectorAll('.palette-invite, .section-heading, .philosophy, .mens-routine').forEach(node => { node.classList.add('reveal'); observer.observe(node); });
+  }
+</script>

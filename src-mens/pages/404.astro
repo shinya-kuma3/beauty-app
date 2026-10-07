@@ -1,0 +1,5 @@
+---
+import Layout from '../../src/layouts/Layout.astro';
+import { pathTo, mainPathTo } from '../../src/lib/content';
+---
+<Layout title="ページが見つかりません" theme="mens"><div class="shell section listing"><p class="eyebrow">404 / PAGE NOT FOUND</p><h1>ページが見つかりませんでした。</h1><p style="margin:20px 0 30px">成分図鑑・ケア記事・診断は、総合サイトからご覧いただけます。</p><div class="hero-actions"><a class="button primary" href={pathTo()}>メンズトップへ →</a><a class="text-link" href={mainPathTo('search/')}>総合サイトで検索する →</a></div></div></Layout>

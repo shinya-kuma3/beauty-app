@@ -24,7 +24,8 @@ export function validateRecords(records) {
     seen.add(key);
     if ('slug' in data) fail('slug は指定せず、ファイル名を ID として使ってください');
     for (const field of ['title', 'summary']) if (typeof data[field] !== 'string' || !data[field].trim()) fail(`${field} が必要です`);
-    if (!['skin', 'hair'].includes(data.category)) fail('category は skin / hair のいずれかです');
+    if (!['skin', 'hair', 'nail', 'body'].includes(data.category)) fail('category は skin / hair / nail / body のいずれかです');
+    if (data.areas !== undefined && (!Array.isArray(data.areas) || !data.areas.length || !data.areas.every(area => ['skin', 'hair', 'nail', 'body'].includes(area)) || !data.areas.includes(data.category))) fail('areas は有効なカテゴリと主カテゴリを含めてください');
     if (data.status !== undefined && !['draft', 'published'].includes(data.status)) fail('status は draft / published のいずれかです');
     const date = typeof data.updatedAt === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(data.updatedAt) ? new Date(`${data.updatedAt}T00:00:00Z`) : new Date(NaN);
     if (!Number.isFinite(date.getTime()) || date.toISOString().slice(0, 10) !== data.updatedAt) fail('updatedAt は実在する YYYY-MM-DD の日付にしてください');
