@@ -1,16 +1,16 @@
 // Editorial guides to finished cosmetic products, not medical diagnoses.
 const option = (id, label, description, ingredients) => ({ id, label, description, ingredients });
 export const careAreas = [
-  { id: 'hair', label: '髪', english: 'HAIR', icon: 'hair', description: '毛先や手触りのケア', article: 'hair-washing-basics',
-    states: [option('dry', '毛先がパサつく', '乾燥したような手触りが気になる', ['panthenol', 'glycerin']), option('tangled', '指通りが気になる', 'とかすときの引っかかりをケアしたい', ['dimethicone', 'panthenol']), option('daily', 'いつものケアを見直したい', '自分に合うヘアケアを考えたい', ['glycerin', 'dimethicone'])],
-    goals: [option('smooth', 'なめらかな指通り', '手触りを整えるケアを探す', ['dimethicone', 'panthenol']), option('moist', 'しっとりした仕上がり', '保湿を意識した配合を知る', ['glycerin', 'panthenol']), option('simple', '続けやすいケア', 'いつものコンディショナーを見直す', ['panthenol', 'dimethicone'])],
-    tips: '毛先を中心に、製品の説明どおりの量を。仕上がりは髪質と配合全体で変わります。',
-    reasons: { dimethicone: '髪を整えるコンディショニング成分。指通りを考える製品選びの候補に。', panthenol: 'ヘアコンディショニング用途が報告されている成分。手触りを整える配合を知る手がかりに。', glycerin: '保湿・ヘアコンディショニング用途のある成分。うるおいを意識した配合の候補に。' } },
   { id: 'skin', label: '肌', english: 'SKIN', icon: 'face', description: '顔のうるおいを考える', article: 'moisturizer-basics',
     states: [option('dry', '乾燥・つっぱりが気になる', '洗顔後のうるおいを見直したい', ['ceramide', 'hyaluronic-acid']), option('mixed', 'ベタつきと乾燥が混在', '部位で違う使用感が気になる', ['glycerin', 'niacinamide']), option('daily', 'いつものケアを見直したい', '基本の保湿を知りたい', ['glycerin', 'ceramide'])],
     goals: [option('moist', 'うるおいを保ちたい', '保湿を中心に選ぶ', ['hyaluronic-acid', 'ceramide']), option('comfortable', '心地よい使用感', '肌になじむ保湿の役割を知る', ['glycerin', 'hyaluronic-acid']), option('simple', '基本を整えたい', '毎日の保湿から始める', ['ceramide', 'glycerin'])],
     tips: 'さっぱり・しっとりは成分名だけでは決まりません。香料の有無や使い心地も確認しましょう。',
     reasons: { ceramide: '肌のうるおいを支える脂質に関連する保湿成分。乾燥を意識したケアの候補に。', 'hyaluronic-acid': '水分を保つ保湿成分。うるおいを補う製品選びの手がかりに。', glycerin: '角層の水分を保つ保湿成分。日常の保湿製品に広く使われます。', niacinamide: '整肌・保湿製品に使われる成分。肌を整える配合を考える候補に。皮脂への効果を保証するものではありません。' } },
+  { id: 'hair', label: '髪', english: 'HAIR', icon: 'hair', description: '毛先や手触りのケア', article: 'hair-washing-basics',
+    states: [option('dry', '毛先がパサつく', '乾燥したような手触りが気になる', ['panthenol', 'glycerin']), option('tangled', '指通りが気になる', 'とかすときの引っかかりをケアしたい', ['dimethicone', 'panthenol']), option('daily', 'いつものケアを見直したい', '自分に合うヘアケアを考えたい', ['glycerin', 'dimethicone'])],
+    goals: [option('smooth', 'なめらかな指通り', '手触りを整えるケアを探す', ['dimethicone', 'panthenol']), option('moist', 'しっとりした仕上がり', '保湿を意識した配合を知る', ['glycerin', 'panthenol']), option('simple', '続けやすいケア', 'いつものコンディショナーを見直す', ['panthenol', 'dimethicone'])],
+    tips: '毛先を中心に、製品の説明どおりの量を。仕上がりは髪質と配合全体で変わります。',
+    reasons: { dimethicone: '髪を整えるコンディショニング成分。指通りを考える製品選びの候補に。', panthenol: 'ヘアコンディショニング用途が報告されている成分。手触りを整える配合を知る手がかりに。', glycerin: '保湿・ヘアコンディショニング用途のある成分。うるおいを意識した配合の候補に。' } },
   { id: 'nail', label: '爪', english: 'NAIL', icon: 'nail', description: '爪と指先をいたわる', article: 'nail-care-basics',
     states: [option('dry', '爪まわりが乾燥しやすい', '指先の保湿を考えたい', ['glycerin', 'petrolatum']), option('polish', 'ネイル後のケアをしたい', 'ネイルを休む時間の保湿に', ['petrolatum', 'glycerin']), option('washing', '手洗い・水仕事が多い', '日常の乾燥対策をしたい', ['glycerin', 'petrolatum'])],
     goals: [option('protect', 'うるおいを守りたい', '爪や甘皮の保護を意識する', ['petrolatum', 'glycerin']), option('comfortable', '日中も続けたい', '使いやすいハンドケアを考える', ['glycerin', 'petrolatum']), option('night', '夜にじっくりケア', '指先まで保湿する習慣に', ['petrolatum', 'glycerin'])],

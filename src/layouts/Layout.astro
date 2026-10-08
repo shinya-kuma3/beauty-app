@@ -27,7 +27,7 @@ const isMensView = isMensSite || active === 'mens';
       <div class="header-actions"><a class="header-search" href={mainPathTo('search/')} aria-label="成分や記事を検索"><Icon name="search" size={20} /></a><a class:list={['mens-button', { 'main-site-button': isMensView }]} href={isMensView ? mainPathTo() : mensPathTo()}>{isMensView ? '総合トップ' : 'メンズケア'}<Icon name="arrow" size={15} /></a></div>
     </div></header>
     <main id="main"><slot /></main>
-    <footer class="footer"><div class="shell footer-top"><div><a class="brand footer-brand" href={pathTo()}>my beauty <span class="brand-note">palette</span></a><p>知ることから、心地よいケアへ。</p></div><div class="footer-links"><a href={mainPathTo('ingredients/')}>成分図鑑</a><a href={mainPathTo('finder/')}>成分診断</a><a href={mensPathTo()}>メンズケア</a><a href={mainPathTo('about/')}>このサイトについて</a></div></div><div class="shell footer-bottom"><span>© {new Date().getFullYear()} my beauty palette</span><span>自分をいたわる、小さな知識の積み重ね。</span></div></footer>
+    <footer class="footer"><div class="shell footer-top"><div><a class="brand footer-brand" href={pathTo()}>my beauty <span class="brand-note">palette</span></a><p>知ることから、心地よいケアへ。</p></div><div class="footer-links"><a href={mainPathTo('ingredients/')}>成分図鑑</a><a href={mainPathTo('articles/')}>ケア記事</a><a href={mainPathTo('finder/')}>成分診断</a><a href={mensPathTo()}>メンズケア</a><a href={mainPathTo('about/')}>このサイトについて</a></div></div><div class="shell footer-bottom"><span>© {new Date().getFullYear()} my beauty palette</span><span>自分をいたわる、小さな知識の積み重ね。</span></div></footer>
   </body>
 </html>
 <script>
