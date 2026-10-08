@@ -1,8 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { siteSettings } from '../scripts/site-settings.mjs';
+import { siteSettings, useSameOriginMens } from '../scripts/site-settings.mjs';
 import { mainLink, mensLink } from '../src/lib/site-links.mjs';
 const urls = { main: 'https://beauty.example/', mens: 'https://mens.beauty.example/' };
+test('Cloudflareのテストブランチは同じホスト、本番mainはメンズサブドメインを使う', () => {
+  for (const branch of ['develop', 'codex/fix-preview-mens-navigation']) assert.equal(useSameOriginMens({ WORKERS_CI_BRANCH: branch }), true);
+  assert.equal(useSameOriginMens({ WORKERS_CI_BRANCH: 'main' }), false);
+  assert.equal(useSameOriginMens({}), false);
+  assert.equal(useSameOriginMens({ BEAUTY_LOCAL_PREVIEW: 'true', WORKERS_CI_BRANCH: 'main' }), true);
+});
 test('本体とメンズを行き来し、共通記事は本体へつなぐ', () => {
   assert.equal(mensLink({ mensUrl: urls.mens }), urls.mens);
   assert.equal(mainLink('articles/mens-care-basics/', { mensSite: true, mainUrl: urls.main }), `${urls.main}articles/mens-care-basics/`);

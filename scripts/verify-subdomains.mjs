@@ -1,7 +1,7 @@
 import { readFile, access } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import assert from 'node:assert/strict';
-import { loadLocalEnv, deploymentSettings } from './site-settings.mjs';
+import { loadLocalEnv, deploymentSettings, useSameOriginMens } from './site-settings.mjs';
 loadLocalEnv();
 const localPreview = process.argv.includes('--local');
 if (localPreview) {
@@ -9,14 +9,17 @@ if (localPreview) {
   process.env.PUBLIC_MENS_SITE_URL = 'http://127.0.0.1:4326/';
 }
 const urls = deploymentSettings();
+const sameOriginMens = localPreview || useSameOriginMens();
 const main = await readFile('dist/index.html', 'utf8');
 const mens = await readFile('dist-mens/index.html', 'utf8');
 const old = await readFile('dist/mens/index.html', 'utf8');
 const base = (process.env.BASE_PATH || '/').replace(/\/$/, '');
-if (localPreview) {
-  assert.ok(main.includes(`href="${base}/mens/"`), 'ローカルでは現在のポート内のメンズへ');
-  assert.ok(old.includes('mens-theme') && old.includes('総合トップ') && !old.includes('http-equiv="refresh"'), 'ローカル /mens/ はメンズページを表示');
-  await assert.rejects(access('dist/_redirects'), 'ローカルでは外部転送しない');
+if (sameOriginMens) {
+  assert.ok(main.includes(`href="${base}/mens/"`), 'プレビューでは同じホストのメンズへ');
+  assert.ok(old.includes('mens-theme') && old.includes('総合トップ') && !old.includes('http-equiv="refresh"'), 'プレビュー /mens/ はメンズページを表示');
+  for (const path of ['', 'search/', 'ingredients/', 'articles/', 'finder/']) assert.ok(old.includes(`href="${base}/${path}"`), `プレビューのメンズから共通ページへ: ${path}`);
+  for (const html of [main, old]) assert.ok(!html.includes(`href="${urls.mens}"`), 'プレビューから本番メンズへ移動しない');
+  await assert.rejects(access('dist/_redirects'), 'プレビューでは本番へ転送しない');
 } else {
   const redirects = await readFile('dist/_redirects', 'utf8');
   assert.ok(main.includes(`href="${urls.mens}"`), '本体のヘッダーからメンズへ');
@@ -30,4 +33,4 @@ for (const match of mens.matchAll(/(?:src|href)="(\/(?:_astro\/[^"\s]+|favicon.s
 for (const path of ['ingredients', 'articles', 'finder', 'search-index.json']) await assert.rejects(access(resolve('dist-mens', path)), `共通コンテンツを重複生成しない: ${path}`);
 assert.ok(!/href="\/(?:ingredients|articles|finder|search|about)\//.test(mens), 'メンズ側に存在しないローカルリンクを作らない');
 await access('dist-mens/404.html');
-console.log(`Subdomains verified: independent mens root, main content links, local assets, canonical and ${localPreview ? 'same-origin local navigation' : 'Cloudflare redirects'}`);
+console.log(`Subdomains verified: independent mens root, main content links, local assets, canonical and ${sameOriginMens ? 'same-origin preview navigation' : 'Cloudflare redirects'}`);

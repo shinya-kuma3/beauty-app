@@ -71,6 +71,16 @@ npm run preview:mens
 
 ## 現在の接続状況
 
+### Workers Builds の develop プレビュー
+
+Workers Builds を使う場合は、Production branch を `main`、テスト用の Tracking branch を `develop` とします。Build command は `npm run build`、Preview command は `npx wrangler preview`。`wrangler.jsonc` の `previews` 設定でプレビューを有効にしています。
+
+Cloudflare がビルド時に渡す `WORKERS_CI_BRANCH` が `main` 以外の場合、本体のメンズボタンは同じプレビューURL内の `/mens/` を開きます。メンズから総合トップ・検索・記事・診断にも同じホストで移動します。プレビュー用のメンズサブドメインやDNS設定は不要です。`main` の本番ビルドは引き続き `mens.my-beauty-palette.com` へのリンクと転送を生成します。
+
+プレビューのデプロイ成功後、Cloudflareの Previews で `develop` の最新URLを開いて確認してください。過去のデプロイ固有URLには、その時点の古いリンク設定が残る場合があります。
+
+参考: [Workers Builds のブランチ環境変数](https://developers.cloudflare.com/workers/ci-cd/builds/configuration/#default-variables)
+
 リポジトリ内の公開構成を用意した状態です。Cloudflare Pages プロジェクトの作成、GitHub アプリの接続、DNS の変更は、このファイルやビルドだけでは実行されません。
 
 参考: [Cloudflare・同じリポジトリから複数プロジェクトを公開する](https://developers.cloudflare.com/pages/configuration/monorepos/)、[ビルド設定](https://developers.cloudflare.com/pages/configuration/build-configuration/)、[カスタムドメイン](https://developers.cloudflare.com/pages/configuration/custom-domains/)、[Astro の静的リダイレクト](https://docs.astro.build/en/reference/configuration-reference/#redirects)

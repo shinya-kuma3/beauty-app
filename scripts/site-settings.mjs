@@ -5,6 +5,11 @@ import { deploymentSites } from '../site.config.mjs';
 export function loadLocalEnv() {
   if (existsSync('.env')) loadEnvFile('.env');
 }
+export function useSameOriginMens(env = process.env) {
+  // Workers Builds supplies the branch for both production and preview builds.
+  const branch = env.WORKERS_CI_BRANCH?.trim();
+  return env.BEAUTY_LOCAL_PREVIEW === 'true' || Boolean(branch && branch !== 'main');
+}
 export function siteUrl(value, name) {
   if (!value?.trim()) return '';
   const url = new URL(value.trim());
