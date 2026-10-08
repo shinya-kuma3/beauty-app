@@ -33,7 +33,25 @@ Grok Botは外部のアシスタントで、収集・信頼性の確認・記事
 
 ## テスト環境の設定順序
 
-この実装時点ではCloudflare CLIは未ログイン。リモートDB、APIキー、Access、公開への反映は未設定・未検証。秘密の値をGitHubやチャットに貼らない。
+2026-10-08現在、テストD1 `beauty-content-test`（`c2466b2d-e802-47e7-8f7a-9e75aa9aa36c`）へのマイグレーションは適用済み。DBを作り直す必要はない。
+
+作業ブランチの固定Preview URL：
+[作業ブランチのテストサイト](https://codex-content-review-pipeline-beauty-app.sinyak4649.workers.dev/)
+
+本体・メンズの表示、developmentのD1接続、未認証アクセスの拒否をリモートで確認済み。これは `codex/content-review-pipeline` 用で、developへの統合はまだ行っていない。
+
+`INGEST_API_KEY` と `CONTENT_EXPORT_KEY` は別々のランダム値を生成し、このPreviewへ登録済み。値はGit対象外の `.dev.vars`、Preview URLはGit対象外の `.env` に保存している。この2つのキーの再生成・再登録は不要。
+
+次は手順3の `GEMINI_API_KEY`・`YOUTUBE_API_KEY`、手順4のAccess、手順5の再ビルド設定を行う。実AI・管理者ログイン・公開反映は未検証。秘密の値をGitHubやチャットに貼らない。
+
+現在のPreviewへGoogleのキーを登録するコマンド：
+
+```powershell
+npx wrangler preview secret put GEMINI_API_KEY --name "codex/content-review-pipeline"
+npx wrangler preview secret put YOUTUBE_API_KEY --name "codex/content-review-pipeline"
+```
+
+[Geminiのキー作成手順](https://ai.google.dev/gemini-api/docs/api-key)、[YouTube Data APIの設定手順](https://developers.google.com/youtube/v3/getting-started)を参照する。YouTubeではData API v3を有効にし、YouTube専用のAPIキーを作成する。以下は新しい環境を準備する場合も含む一般的な設定手順。
 
 ### 1. Cloudflareにログインし、テストDBを作る
 
@@ -256,4 +274,4 @@ npm run sample:ai
 
 自動テスト38件、Astroの型検査、本体58ページとメンズ2ページのビルド、サブドメインのリンク検証、Workerの配布用バンドル、ローカルD1のマイグレーションを確認済み。承認記事のサンプルを取り込んだビルドで本文・一覧・検索・AI注記・HTMLの無害化も検証し、検証用データは除去した。ローカルWorkerでは公開ページ200、未認証の管理者アクセス403、Bot・export API401を確認した。
 
-リモートのPreview、実際のGemini/Workers AI、Accessログイン、Deploy Hookによる再ビルドの確認は、上の環境設定後に行う。
+リモートの作業ブランチPreviewの表示・D1・認証の拒否は確認済み。実際のGemini/Workers AI、Accessログイン、Deploy Hookによる再ビルドの確認は、上の環境設定後に行う。

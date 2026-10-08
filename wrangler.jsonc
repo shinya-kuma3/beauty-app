@@ -3,8 +3,12 @@
   "name": "beauty-app",
   "main": "worker/index.ts",
   "compatibility_date": "2026-10-07",
-  "ai": { "binding": "AI" },
-  "triggers": { "crons": ["0 0 * * *", "15 * * * *"] },
+  "ai": {
+    "binding": "AI"
+  },
+  "triggers": {
+    "crons": ["0 0 * * *", "15 * * * *"]
+  },
   "d1_databases": [
     {
       "binding": "DB",
@@ -20,12 +24,14 @@
     "AI_DAILY_TOKEN_LIMIT": "600000"
   },
   "previews": {
-    "ai": { "binding": "AI" },
+    "ai": {
+      "binding": "AI"
+    },
     "d1_databases": [
       {
         "binding": "DB",
         "database_name": "beauty-content-test",
-        "database_id": "00000000-0000-0000-0000-000000000000",
+        "database_id": "c2466b2d-e802-47e7-8f7a-9e75aa9aa36c",
         "migrations_dir": "migrations"
       }
     ],
