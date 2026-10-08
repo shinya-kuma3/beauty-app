@@ -10,4 +10,7 @@ dist-mens/
 .env.*
 !.env.example
 .npm-cache/
+src/content/generated-articles/
+public/content-manifest.json
+wrangler.test.local.json
 *.log

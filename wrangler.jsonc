@@ -1,10 +1,45 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "beauty-app",
+  "main": "worker/index.ts",
   "compatibility_date": "2026-10-07",
-  "previews": {},
+  "ai": { "binding": "AI" },
+  "triggers": { "crons": ["0 0 * * *", "15 * * * *"] },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "beauty-content-production",
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "vars": {
+    "PIPELINE_ENV": "production",
+    "ENABLE_SCHEDULED": "false",
+    "AI_DAILY_CALL_LIMIT": "30",
+    "AI_DAILY_TOKEN_LIMIT": "600000"
+  },
+  "previews": {
+    "ai": { "binding": "AI" },
+    "d1_databases": [
+      {
+        "binding": "DB",
+        "database_name": "beauty-content-test",
+        "database_id": "00000000-0000-0000-0000-000000000000",
+        "migrations_dir": "migrations"
+      }
+    ],
+    "vars": {
+      "PIPELINE_ENV": "development",
+      "ENABLE_SCHEDULED": "false",
+      "AI_DAILY_CALL_LIMIT": "30",
+      "AI_DAILY_TOKEN_LIMIT": "600000"
+    }
+  },
   "assets": {
     "directory": "./dist",
+    "binding": "ASSETS",
+    "run_worker_first": ["/admin", "/admin/*", "/api/*"],
     "html_handling": "auto-trailing-slash",
     "not_found_handling": "404-page"
   }

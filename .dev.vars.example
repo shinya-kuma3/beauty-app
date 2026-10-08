@@ -1,0 +1,11 @@
+# Copy to .dev.vars for local use only. This file contains no real secrets.
+PIPELINE_ENV=development
+ENABLE_SCHEDULED=false
+INGEST_API_KEY=
+GEMINI_API_KEY=
+YOUTUBE_API_KEY=
+CONTENT_EXPORT_KEY=
+CONTENT_DEPLOY_HOOK=
+ACCESS_TEAM_DOMAIN=
+ACCESS_AUD=
+ADMIN_EMAILS=

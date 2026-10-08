@@ -16,13 +16,23 @@
     "build:mens": "npm run validate:content && node scripts/site-command.mjs mens build",
     "build:mens:local": "npm run validate:content && node scripts/site-command.mjs mens build --local",
     "preview:mens": "node scripts/site-command.mjs mens preview --local",
-    "test:subdomains": "node scripts/verify-subdomains.mjs"
+    "test:subdomains": "node scripts/verify-subdomains.mjs",
+    "dev:worker": "wrangler dev --local --port 8787",
+    "test:pipeline": "node --test tests/pipeline.test.mjs",
+    "setup:cloudflare": "node scripts/setup-cloudflare.mjs",
+    "sample:ai": "node scripts/sample-ai.mjs"
   },
   "dependencies": {
-    "astro": "7.3.6"
+    "astro": "7.3.6",
+    "hono": "^4.13.13",
+    "jose": "^6.2.12",
+    "markdown-it": "^15.0.2",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@astrojs/check": "0.9.10",
+    "@cloudflare/workers-types": "^5.20261008.1",
+    "@types/markdown-it": "^14.2.0",
     "typescript": "~5.9.3",
     "wrangler": "^4.148.0"
   },
