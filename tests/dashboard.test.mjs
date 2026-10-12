@@ -54,8 +54,20 @@ async function setup(role = 'editor', members = []) {
     if (block) await block;
     if (path === 'me')
       return Response.json({ email: 'editor@example.test', role });
+    if (path === 'article-filters')
+      return Response.json({
+        tags: ['スキンケア', '乾燥肌'],
+        dates: {
+          first_created: '2019-01-01T00:00:00.000Z',
+          last_created: '2026-10-12T00:00:00.000Z',
+        },
+      });
     if (path.startsWith('articles?'))
-      return Response.json({ articles: [row], next_offset: null });
+      return Response.json({
+        articles: [row],
+        next_cursor: null,
+        total: 1,
+      });
     if (
       path === 'articles/test-article' &&
       (options.method || 'GET') === 'GET'
@@ -216,7 +228,15 @@ test('停止した編集者だけに削除を表示し、確認後に削除API�
     assert.equal(rows[0].classList.contains('inactive'), true);
     assert.equal(rows[0].querySelectorAll('button').length, 2);
     assert.equal(rows[1].querySelectorAll('button').length, 1);
-    rows[0].querySelectorAll('button')[1].click();
+    assert.equal(
+      rows[0].querySelector('.member-actions').firstChild.textContent,
+      '削除',
+    );
+    assert.equal(
+      rows[0].querySelector('.member-actions').lastChild.textContent,
+      '利用を再開',
+    );
+    rows[0].querySelector('button.danger').click();
     await settle();
     assert.ok(
       s.calls.some(
@@ -226,6 +246,114 @@ test('停止した編集者だけに削除を表示し、確認後に削除API�
           c.body.email === 'inactive@example.test',
       ),
     );
+  } finally {
+    await s.window.happyDOM.close();
+  }
+});
+
+test('詳細検索をサーバーへ送り、検索しても編集中の本文を残す', async () => {
+  const s = await setup();
+  try {
+    s.$('articles').querySelector('button').click();
+    await settle();
+    const body = s.$('editor').elements.body_markdown;
+    body.value = '編集中';
+    body.dispatchEvent(new s.window.Event('input'));
+    s.$('article-search').value = '(保湿 OR セラミド) AND NOT 香料';
+    s.$('search-tags').value = '乾燥肌, スキンケア';
+    s.$('tag-mode').value = 'or';
+    s.$('search-month').value = '2026-10';
+    s.$('date-basis').value = 'updated';
+    s.$('article-filters').querySelector('input[value="skin"]').checked =
+      true;
+    s.$('article-filters').dispatchEvent(
+      new s.window.Event('submit', { cancelable: true }),
+    );
+    await settle();
+    const call = s.calls
+        .filter((c) => c.path.startsWith('articles?'))
+        .at(-1),
+      params = new URLSearchParams(call.path.split('?')[1]);
+    assert.equal(params.get('q'), '(保湿 OR セラミド) AND NOT 香料');
+    assert.equal(params.get('tags'), '乾燥肌, スキンケア');
+    assert.equal(params.get('tag_mode'), 'or');
+    assert.equal(params.get('month'), '2026-10');
+    assert.equal(params.get('date_basis'), 'updated');
+    assert.deepEqual(params.getAll('category'), ['skin']);
+    assert.equal(body.value, '編集中');
+    assert.equal(s.$('save-state').textContent, '未保存の変更あり');
+    assert.equal(s.$('article-count').textContent, '1件中 1件表示');
+    assert.equal(s.$('tag-options').children.length, 2);
+    assert.match(s.$('search-decade').textContent, /2010年代/);
+    s.$('reset-search').click();
+    await settle();
+    const reset = new URLSearchParams(
+      s.calls
+        .filter((c) => c.path.startsWith('articles?'))
+        .at(-1)
+        .path.split('?')[1],
+    );
+    assert.equal(reset.has('q'), false);
+    assert.equal(reset.has('month'), false);
+    assert.equal(reset.get('status'), 'pending_review');
+    assert.equal(body.value, '編集中');
+  } finally {
+    await s.window.happyDOM.close();
+  }
+});
+
+test('続きを表示するとき未適用のフォーム変更を混ぜず、APIの検索エラーを表示する', async () => {
+  const s = await setup();
+  try {
+    const original = s.window.fetch;
+    s.window.fetch = async (url, options) => {
+      const params = new URLSearchParams(String(url).split('?')[1]);
+      if (String(url).startsWith('/api/admin/articles?')) {
+        await original(url, options);
+        if (params.get('q') === 'invalid')
+          return Response.json(
+            {
+              error: {
+                code: 'invalid_search_query',
+                message: '閉じかっこが足りません。',
+              },
+            },
+            { status: 400 },
+          );
+        return Response.json({
+          articles: [row],
+          total: 2,
+          next_cursor: params.has('cursor') ? null : 'test-cursor',
+        });
+      }
+      return original(url, options);
+    };
+    s.$('article-search').value = '保湿';
+    s.$('article-filters').dispatchEvent(
+      new s.window.Event('submit', { cancelable: true }),
+    );
+    await settle();
+    assert.equal(s.$('more').hidden, false);
+    s.$('article-search').value = '未適用';
+    s.$('more').click();
+    await settle();
+    let params = new URLSearchParams(
+      s.calls
+        .filter((c) => c.path.startsWith('articles?'))
+        .at(-1)
+        .path.split('?')[1],
+    );
+    assert.equal(params.get('q'), '保湿');
+    assert.equal(params.get('cursor'), 'test-cursor');
+    assert.equal(s.$('article-count').textContent, '2件中 2件表示');
+    assert.equal(s.$('more').hidden, true);
+    s.$('article-search').value = 'invalid';
+    s.$('article-filters').dispatchEvent(
+      new s.window.Event('submit', { cancelable: true }),
+    );
+    await settle();
+    assert.match(s.$('message').textContent, /閉じかっこが足りません/);
+    assert.equal(s.$('articles').querySelectorAll('button').length, 2);
   } finally {
     await s.window.happyDOM.close();
   }

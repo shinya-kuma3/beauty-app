@@ -38,6 +38,10 @@ const roleMigration = await readFile(
   new URL('../migrations/0003_ai_roles.sql', import.meta.url),
   'utf8',
 );
+const searchMigration = await readFile(
+  new URL('../migrations/0004_article_search.sql', import.meta.url),
+  'utf8',
+);
 class D1 {
   constructor() {
     this.queries = 0;
@@ -45,6 +49,7 @@ class D1 {
     this.sql.exec(migration);
     this.sql.exec(editorMigration);
     this.sql.exec(roleMigration);
+    this.sql.exec(searchMigration);
   }
   prepare(query) {
     this.queries++;
@@ -1376,4 +1381,46 @@ test('類似記事は公開承認済みの最新埋め込みだけを最大5件�
     false,
   );
   assert.equal(geminiCalls, before);
+});
+
+test('詳細検索と検索候補はAccess認証が必要で、編集者にも検索を許可する', async () => {
+  const e = env();
+  e.DB.sql
+    .prepare(
+      'INSERT INTO editors(email,added_by,updated_at) VALUES(?,?,?)',
+    )
+    .run(
+      'editor@example.test',
+      'admin@example.test',
+      new Date().toISOString(),
+    );
+  const item = await submitted(e);
+  for (const path of [
+    '/api/admin/article-filters',
+    '/api/admin/articles?q=保湿',
+  ]) {
+    assert.equal((await request(e, path)).response.status, 403);
+    assert.equal(
+      (await request(e, path, 'GET', null, 'editor')).response.status,
+      200,
+    );
+  }
+  const result = await request(
+    e,
+    '/api/admin/articles?q=保湿&category=skin',
+    'GET',
+    null,
+    'editor',
+  );
+  assert.equal(result.data.total, 1);
+  assert.equal(result.data.articles[0].id, item);
+  const bad = await request(
+    e,
+    '/api/admin/articles?q=AND',
+    'GET',
+    null,
+    true,
+  );
+  assert.equal(bad.response.status, 400);
+  assert.match(bad.data.error.message, /検索語/);
 });

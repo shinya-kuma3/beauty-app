@@ -1,6 +1,8 @@
 const $ = (id) => document.getElementById(id);
 let current = null,
-  nextOffset = null,
+  nextCursor = null,
+  total = 0,
+  appliedFilters = new URLSearchParams({ status: 'pending_review' }),
   dirty = false,
   busy = false,
   identity = null,
@@ -76,7 +78,8 @@ async function api(path, method = 'GET', body) {
   }
   if (!r.ok)
     throw new Error(
-      messages[data.error?.code] ||
+      data.error?.message ||
+        messages[data.error?.code] ||
         '処理できませんでした。入力と設定を確認してください。',
     );
   return data;
@@ -137,19 +140,62 @@ function markDirty() {
   $('confirm').checked = false;
   updateActions();
 }
-function filterList() {
-  const query = $('article-search').value.trim().toLowerCase();
-  for (const b of $('articles').querySelectorAll('button'))
-    b.hidden = !b.dataset.title.includes(query);
-  $('article-count').textContent = listed.length + '件取得';
+function readFilters() {
+  const params = new URLSearchParams();
+  // action() disables the fields before executing a task; read values directly.
+  for (const field of $('article-filters').elements) {
+    if (
+      !field.name ||
+      !field.value ||
+      (field.type === 'checkbox' && !field.checked)
+    )
+      continue;
+    params.append(field.name, field.value.trim());
+  }
+  return params;
 }
-async function list(append = false) {
-  const data = await api(
-    'articles?status=' +
-      $('status').value +
-      '&offset=' +
-      (append ? nextOffset : 0),
-  );
+async function applySearch() {
+  const candidate = readFilters();
+  await list(false, candidate);
+  appliedFilters = candidate;
+  return '検索しました。編集中の記事はそのまま残しています。';
+}
+async function loadFilters() {
+  const data = await api('article-filters');
+  $('tag-options').replaceChildren();
+  for (const tag of data.tags) {
+    const option = el('option');
+    option.value = tag;
+    $('tag-options').append(option);
+  }
+  const years = Object.values(data.dates)
+    .filter(Boolean)
+    .map((value) =>
+      Number(
+        new Intl.DateTimeFormat('en', {
+          year: 'numeric',
+          timeZone: 'Asia/Tokyo',
+        }).format(new Date(value)),
+      ),
+    );
+  const newest = Math.max(new Date().getFullYear(), ...years);
+  const oldest = Math.min(newest, ...years);
+  $('search-decade').replaceChildren(el('option', '指定なし'));
+  $('search-decade').firstChild.value = '';
+  for (
+    let year = Math.floor(newest / 10) * 10;
+    year >= Math.floor(oldest / 10) * 10;
+    year -= 10
+  ) {
+    const option = el('option', year + '年代');
+    option.value = String(year);
+    $('search-decade').append(option);
+  }
+}
+async function list(append = false, filters = appliedFilters) {
+  const params = new URLSearchParams(filters);
+  if (append && nextCursor) params.set('cursor', nextCursor);
+  const data = await api('articles?' + params);
   if (!append) {
     $('articles').replaceChildren();
     listed = [];
@@ -162,7 +208,33 @@ async function list(append = false) {
     b.classList.toggle('selected', current?.id === row.id);
     b.append(
       el('strong', row.title),
-      el('small', states[row.ai_status] + ' ・ ' + date(row.updated_at)),
+      el(
+        'small',
+        ({ skin: '肌', hair: '髪', nail: '爪', body: '身体' }[
+          row.category
+        ] || '') +
+          ' ・ ' +
+          states[row.status] +
+          ' ・ ' +
+          states[row.ai_status],
+      ),
+      el(
+        'small',
+        { created: '登録', updated: '更新', published: '公開承認' }[
+          filters.get('date_basis') || 'created'
+        ] +
+          '：' +
+          date(
+            row[
+              {
+                created: 'created_at',
+                updated: 'updated_at',
+                published: 'published_at',
+              }[filters.get('date_basis') || 'created']
+            ],
+          ),
+      ),
+      el('small', (row.tags || []).join(' / ')),
     );
     b.onclick = () => {
       if (
@@ -174,17 +246,19 @@ async function list(append = false) {
     };
     $('articles').append(b);
   }
-  nextOffset = data.next_offset;
-  $('more').hidden = nextOffset === null;
+  nextCursor = data.next_cursor ?? null;
+  if (!append) total = data.total ?? listed.length;
+  $('more').hidden = nextCursor === null;
   if (!listed.length)
     $('articles').append(
       el(
         'p',
-        'この状態の記事はありません。Grok Botから記事を登録すると、確認待ちの一覧に届きます。',
+        '条件に一致する記事はありません。条件を変えて検索してください。',
         'hint',
       ),
     );
-  filterList();
+  $('article-count').textContent =
+    total + '件中 ' + listed.length + '件表示';
 }
 function renderCheck(check) {
   $('check-result').replaceChildren();
@@ -470,15 +544,16 @@ async function members() {
         await members();
         return '権限を更新しました。Cloudflare Accessの許可メールも合わせて更新してください。';
       });
+    const actions = el('div', undefined, 'member-actions');
     row.append(
       el(
         'span',
         member.email + ' ・ ' + (member.active ? '利用中' : '停止中'),
       ),
-      b,
+      actions,
     );
     if (!member.active) {
-      const remove = el('button', '削除', 'secondary');
+      const remove = el('button', '削除', 'danger');
       remove.onclick = () => {
         if (
           !confirm(
@@ -493,8 +568,9 @@ async function members() {
           return '編集者を削除しました。Cloudflare Accessの許可メールからも削除してください。';
         });
       };
-      row.append(remove);
+      actions.append(remove);
     }
+    actions.append(b);
     $('members').append(row);
   }
 }
@@ -741,7 +817,15 @@ $('process').onclick = () =>
   });
 $('refresh').onclick = () => action(refresh);
 $('more').onclick = () => action(() => list(true));
-$('article-search').oninput = filterList;
+$('article-filters').onsubmit = (e) => {
+  e.preventDefault();
+  action(applySearch);
+};
+$('reset-search').onclick = () => {
+  $('article-filters').reset();
+  previousStatus = $('status').value;
+  action(applySearch);
+};
 let previousStatus = $('status').value;
 $('status').onchange = () => {
   if (
@@ -752,11 +836,7 @@ $('status').onchange = () => {
     return;
   }
   previousStatus = $('status').value;
-  current = null;
-  dirty = false;
-  $('detail').hidden = true;
-  $('empty-detail').hidden = false;
-  action(() => list());
+  action(applySearch);
 };
 $('retry-build').onclick = () =>
   action(async () => {
@@ -786,6 +866,7 @@ action(async () => {
     (identity.role === 'admin' ? '管理者' : '編集者');
   $('owner-tools').hidden = identity.role !== 'admin';
   $('team-tools').hidden = identity.role !== 'admin';
+  await loadFilters();
   await refresh();
   return '記事を選んで編集・確認を始めてください。';
 });

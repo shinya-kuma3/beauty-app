@@ -1,10 +1,11 @@
 import { z } from 'zod';
 import MarkdownIt from 'markdown-it';
 export class ApiError extends Error {
-  constructor(status, code) {
+  constructor(status, code, userMessage = '') {
     super(code);
     this.status = status;
     this.code = code;
+    this.userMessage = userMessage;
   }
 }
 export const now = () => new Date().toISOString();

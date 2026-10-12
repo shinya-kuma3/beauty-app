@@ -1,3 +1,4 @@
+import { articleList, filterOptions } from './article-search.mjs';
 import { Hono } from 'hono';
 import { z } from 'zod';
 import {
@@ -94,7 +95,17 @@ app.onError((error: any, c) => {
     console.error(
       JSON.stringify({ event: 'request_failed', path: c.req.path }),
     );
-  return c.json({ error: { code } }, status as any);
+  return c.json(
+    {
+      error: {
+        code,
+        ...(error instanceof ApiError && error.userMessage
+          ? { message: error.userMessage }
+          : {}),
+      },
+    },
+    status as any,
+  );
 });
 app.use('/api/*', async (c, next) => {
   c.header('Cache-Control', 'no-store');
@@ -431,25 +442,14 @@ app.post('/api/ingest/articles', async (c) => {
     201,
   );
 });
+app.get('/api/admin/article-filters', async (c) =>
+  c.json(await filterOptions(c.env)),
+);
 app.get('/api/admin/articles', async (c) => {
   await monitorBuilds(c.env);
-  const status = c.req.query('status') ?? 'pending_review';
-  if (!['pending_review', 'published', 'rejected'].includes(status))
-    throw new ApiError(400, 'invalid_status');
-  const offset = Number(c.req.query('offset') || 0);
-  if (!Number.isInteger(offset) || offset < 0 || offset > 100000)
-    throw new ApiError(400, 'invalid_offset');
-  const rows = (
-    await c.env.DB.prepare(
-      'SELECT id,slug,title,status,ai_status,updated_at,revision,category FROM articles WHERE status=? ORDER BY created_at DESC,id LIMIT 51 OFFSET ?',
-    )
-      .bind(status, offset)
-      .all()
-  ).results;
-  return c.json({
-    articles: rows.slice(0, 50),
-    next_offset: rows.length > 50 ? offset + 50 : null,
-  });
+  return c.json(
+    await articleList(c.env, new URL(c.req.url).searchParams),
+  );
 });
 app.get('/api/admin/articles/:id', async (c) => {
   await monitorBuilds(c.env);
