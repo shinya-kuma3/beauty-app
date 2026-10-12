@@ -1,3 +1,5 @@
+> **現在のAIの役割は [grok-bot-integration.md](grok-bot-integration.md) を優先してください。** 下記の以前のWorkers AI代替生成・内部AI校正は廃止しました。
+
 # 収集・AI処理・審査・公開
 
 ## 構成と変更したファイル

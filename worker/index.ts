@@ -1,6 +1,11 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
-import { reviewInput } from './review.mjs';
+import {
+  latestCheck,
+  requestCheck,
+  pendingChecks,
+  completeCheck,
+} from './grok.mjs';
 import { createRemoteJWKSet, jwtVerify } from 'jose';
 import type {
   D1Database,
@@ -19,6 +24,7 @@ import {
   editInput,
   normalizeUrl,
   contentHash,
+  cosine,
   decode,
   rateLimit,
   renderMarkdown,
@@ -230,6 +236,31 @@ app.post('/api/admin/editors', async (c) => {
   ]);
   return c.json({ email, active: data.active });
 });
+app.delete('/api/admin/editors', async (c) => {
+  const data = parse(
+    z.object({ email: z.email().max(254) }).strict(),
+    await json(c),
+  );
+  const email = data.email.trim().toLowerCase();
+  if (
+    c.env.ADMIN_EMAILS.split(',')
+      .map((s: string) => s.trim().toLowerCase())
+      .includes(email)
+  )
+    throw new ApiError(400, 'bootstrap_admin_immutable');
+  const results = await c.env.DB.batch([
+    c.env.DB.prepare(
+      "INSERT INTO editor_events(email,actor,action,created_at) SELECT email,?,'deleted',? FROM editors WHERE email=? AND active=0",
+    ).bind(c.get('admin'), now(), email),
+    c.env.DB.prepare(
+      'DELETE FROM editors WHERE email=? AND active=0',
+    ).bind(email),
+  ]);
+  if (!results[1].meta.changes)
+    throw new ApiError(409, 'editor_must_be_inactive');
+  return c.json({ email, deleted: true });
+});
+
 app.post('/api/admin/preview', async (c) => {
   const data = parse(
     z.object({ body_markdown: z.string().max(50000) }).strict(),
@@ -447,12 +478,7 @@ app.get('/api/admin/articles/:id', async (c) => {
   )
     .bind(row.id)
     .first();
-  const checkInput = await reviewInput(c.env, row, sources);
-  const check: any = await c.env.DB.prepare(
-    "SELECT c.*,j.state,j.error_code,j.next_attempt_at FROM article_checks c LEFT JOIN ai_jobs j ON j.entity_type='article' AND j.entity_id=c.article_id AND j.content_hash=c.content_hash AND j.job_type='review' WHERE c.article_id=? ORDER BY (c.content_hash=?) DESC,c.created_at DESC,c.id DESC LIMIT 1",
-  )
-    .bind(row.id, checkInput.content_hash)
-    .first();
+  const check = await latestCheck(c.env, row, sources);
   const versions = (
     await c.env.DB.prepare(
       'SELECT revision,title,created_at FROM article_versions WHERE article_id=? ORDER BY revision DESC LIMIT 30',
@@ -461,23 +487,7 @@ app.get('/api/admin/articles/:id', async (c) => {
       .all()
   ).results;
   return c.json({
-    check: check
-      ? {
-          id: check.id,
-          revision: check.revision,
-          state: check.state,
-          error_code: check.error_code,
-          next_attempt_at: check.next_attempt_at,
-          requested_by: check.requested_by,
-          created_at: check.created_at,
-          completed_at: check.completed_at,
-          model: check.model,
-          result: check.result ? JSON.parse(check.result) : null,
-          body_chars: check.body_chars,
-          reviewed_chars: check.reviewed_chars,
-          stale: check.content_hash !== checkInput.content_hash,
-        }
-      : null,
+    check,
     versions,
     article: decode(row),
     sources,
@@ -503,73 +513,66 @@ app.get('/api/admin/articles/:id/versions/:revision', async (c) => {
     preview_html: renderMarkdown(version.body_markdown),
   });
 });
+app.get('/api/admin/articles/:id/related', async (c) => {
+  const model = settings(c.env).embeddingModel;
+  const embedding: any = await c.env.DB.prepare(
+    "SELECT e.vector FROM embeddings e JOIN articles a ON a.id=e.entity_id AND a.content_hash=e.content_hash WHERE e.entity_type='article' AND e.entity_id=? AND e.model=? ORDER BY e.created_at DESC LIMIT 1",
+  )
+    .bind(c.req.param('id'), model)
+    .first();
+  if (!embedding) return c.json({ articles: [] });
+  const candidates = (
+    await c.env.DB.prepare(
+      "SELECT a.id,a.slug,a.title,a.tags,e.vector FROM articles a JOIN embeddings e ON e.entity_id=a.id AND e.content_hash=a.content_hash AND e.entity_type='article' AND e.model=? WHERE a.status='published' AND a.id!=? ORDER BY a.published_at DESC LIMIT 100",
+    )
+      .bind(model, c.req.param('id'))
+      .all()
+  ).results;
+  const vector = JSON.parse(embedding.vector);
+  const articles = candidates
+    .map((a: any) => ({
+      id: a.id,
+      slug: a.slug,
+      title: a.title,
+      tags: JSON.parse(a.tags),
+      score: cosine(vector, JSON.parse(a.vector)),
+    }))
+    .filter((a) => a.score >= settings(c.env).threshold)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 5);
+  return c.json({ articles, candidate_limit: 100 });
+});
 app.post('/api/admin/articles/:id/ai-check', async (c) => {
   const data = parse(
     z.object({ revision: z.number().int().positive() }).strict(),
     await json(c),
   );
-  const id = c.req.param('id');
-  const row: any = await c.env.DB.prepare(
-    "SELECT * FROM articles WHERE id=? AND revision=? AND status='pending_review'",
-  )
-    .bind(id, data.revision)
-    .first();
-  if (!row) throw new ApiError(409, 'revision_conflict');
-  const sources = (
-    await c.env.DB.prepare(
-      'SELECT s.* FROM sources s JOIN article_sources r ON r.source_id=s.id WHERE r.article_id=? ORDER BY s.id',
-    )
-      .bind(id)
-      .all()
-  ).results;
-  const input = await reviewInput(c.env, row, sources);
-  const time = now();
-  const existing: any = await c.env.DB.prepare(
-    'SELECT * FROM article_checks WHERE article_id=? AND content_hash=?',
-  )
-    .bind(id, input.content_hash)
-    .first();
-  if (existing?.result)
-    return c.json({ state: 'complete', cached: true });
-  const mutation = crypto.randomUUID();
-  // Conditional insert + audit in one transaction: stale editors cannot enqueue a check of an older revision.
-  const results = await c.env.DB.batch([
-    c.env.DB.prepare(
-      "INSERT OR IGNORE INTO article_checks(id,article_id,content_hash,revision,input_text,body_chars,reviewed_chars,requested_by,created_at) SELECT ?,id,?,revision,?,?,?,?,? FROM articles WHERE id=? AND revision=? AND status='pending_review'",
-    ).bind(
-      mutation,
-      input.content_hash,
-      input.input_text,
-      input.body_chars,
-      input.reviewed_chars,
-      c.get('admin'),
-      time,
-      id,
+  return c.json(
+    await requestCheck(
+      c.env,
+      c.req.param('id'),
       data.revision,
+      c.get('admin'),
     ),
-    c.env.DB.prepare(
-      "INSERT OR IGNORE INTO ai_jobs(id,entity_type,entity_id,content_hash,next_attempt_at,created_at,job_type) SELECT ?,'article',article_id,content_hash,?,?,'review' FROM article_checks WHERE id=?",
-    ).bind(crypto.randomUUID(), time, time, mutation),
-    c.env.DB.prepare(
-      "INSERT INTO review_events(article_id,actor,action,revision,created_at) SELECT article_id,?,'ai_check_requested',revision,? FROM article_checks WHERE id=?",
-    ).bind(c.get('admin'), time, mutation),
-  ]);
-  if (!results[0].meta.changes && !existing)
-    throw new ApiError(409, 'revision_conflict');
-  // Explicit retry only for failed jobs. Deferred quota jobs keep their next retry date.
-  await c.env.DB.prepare(
-    "UPDATE ai_jobs SET state='queued',next_attempt_at=?,error_code=NULL WHERE entity_type='article' AND entity_id=? AND job_type='review' AND content_hash=? AND state IN ('failed','obsolete')",
-  )
-    .bind(time, id, input.content_hash)
-    .run();
-  return c.json({ state: 'queued' });
+  );
 });
+app.get('/api/ingest/checks', async (c) => {
+  if (c.req.query('status') && c.req.query('status') !== 'pending')
+    throw new ApiError(400, 'invalid_status');
+  const limit = Number(c.req.query('limit') ?? 5);
+  if (!Number.isInteger(limit) || limit < 1 || limit > 10)
+    throw new ApiError(400, 'invalid_input');
+  return c.json(await pendingChecks(c.env, limit));
+});
+app.post('/api/ingest/checks/:id/result', async (c) =>
+  c.json(await completeCheck(c.env, c.req.param('id'), await json(c))),
+);
 app.post('/api/admin/articles/:id/ai-run', async (c) => {
   const data = parse(
     z
       .object({
         revision: z.number().int().positive(),
-        kind: z.enum(['enrich', 'review']),
+        kind: z.literal('enrich'),
       })
       .strict(),
     await json(c),

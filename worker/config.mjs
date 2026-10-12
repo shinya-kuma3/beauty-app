@@ -18,15 +18,12 @@ const number = (env, key, fallback, min, max) => {
     : fallback;
 };
 export function settings(env) {
+  if (env.EMBEDDING_MODEL && env.EMBEDDING_MODEL !== '@cf/baai/bge-m3')
+    throw new Error('unsupported_embedding_model');
   return {
     embeddingModel: env.EMBEDDING_MODEL || '@cf/baai/bge-m3',
     summaryModel: env.GEMINI_MODEL || 'gemini-3.1-flash-lite',
-    fallbackModel: env.FALLBACK_MODEL || '@cf/qwen/qwen3-30b-a3b-fp8',
-    summaryProvider: ['auto', 'gemini', 'workers'].includes(
-      env.SUMMARY_PROVIDER,
-    )
-      ? env.SUMMARY_PROVIDER
-      : 'auto',
+    summaryProvider: 'gemini',
     threshold: Number.isFinite(Number(env.TAG_THRESHOLD ?? 0.55))
       ? Math.min(1, Math.max(-1, Number(env.TAG_THRESHOLD ?? 0.55)))
       : 0.55,
@@ -34,8 +31,6 @@ export function settings(env) {
     embeddingChars: number(env, 'EMBEDDING_INPUT_CHARS', 1200, 100, 3000),
     outputTokens: number(env, 'SUMMARY_MAX_TOKENS', 512, 128, 1024),
     videoOutputTokens: number(env, 'VIDEO_MAX_TOKENS', 1536, 512, 2048),
-    reviewInputChars: number(env, 'REVIEW_INPUT_CHARS', 4000, 500, 6000),
-    reviewOutputTokens: number(env, 'REVIEW_MAX_TOKENS', 1400, 512, 2048),
     dailyCalls: number(env, 'AI_DAILY_CALL_LIMIT', 30, 0, 1000),
     dailyTokens: number(env, 'AI_DAILY_TOKEN_LIMIT', 600000, 0, 1000000),
     maxVideos: number(env, 'YOUTUBE_VIDEOS_PER_RUN', 3, 0, 20),

@@ -28,7 +28,7 @@ async function settle() {
   for (let i = 0; i < 10; i++)
     await new Promise((resolve) => setImmediate(resolve));
 }
-async function setup(role = 'editor') {
+async function setup(role = 'editor', members = []) {
   const window = new Window({
     url: 'https://example.test/admin',
     settings: {
@@ -88,7 +88,7 @@ async function setup(role = 'editor') {
       });
     if (path === 'editors')
       return Response.json({
-        editors: [],
+        editors: members,
         admins: ['admin@example.test'],
       });
     if (options.method === 'PATCH' && conflict)
@@ -135,13 +135,11 @@ test('編集者は個別記事の編集・確認・AIチェックを使い、管
           c.body.revision === 2,
       ),
     );
-    assert.ok(
-      s.calls.some(
-        (c) =>
-          c.path === 'articles/test-article/ai-run' &&
-          c.body.kind === 'review',
-      ),
+    assert.equal(
+      s.calls.some((c) => c.path === 'articles/test-article/ai-run'),
+      false,
     );
+    assert.match(s.$('message').textContent, /Grok Botへの依頼/);
     assert.equal(
       s.calls.some((c) => c.path.endsWith('/review')),
       false,
@@ -203,6 +201,31 @@ test('管理者に編集者管理を表示し、処理中は本文を変更さ�
     release();
     await settle();
     assert.equal(s.$('editor').elements.body_markdown.disabled, false);
+  } finally {
+    await s.window.happyDOM.close();
+  }
+});
+
+test('停止した編集者だけに削除を表示し、確認後に削除APIを呼ぶ', async () => {
+  const s = await setup('admin', [
+    { email: 'inactive@example.test', active: false },
+    { email: 'active@example.test', active: true },
+  ]);
+  try {
+    const rows = [...s.$('members').querySelectorAll('.member-row')];
+    assert.equal(rows[0].classList.contains('inactive'), true);
+    assert.equal(rows[0].querySelectorAll('button').length, 2);
+    assert.equal(rows[1].querySelectorAll('button').length, 1);
+    rows[0].querySelectorAll('button')[1].click();
+    await settle();
+    assert.ok(
+      s.calls.some(
+        (c) =>
+          c.path === 'editors' &&
+          c.method === 'DELETE' &&
+          c.body.email === 'inactive@example.test',
+      ),
+    );
   } finally {
     await s.window.happyDOM.close();
   }

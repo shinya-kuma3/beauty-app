@@ -34,12 +34,17 @@ const editorMigration = await readFile(
   new URL('../migrations/0002_editor_dashboard.sql', import.meta.url),
   'utf8',
 );
+const roleMigration = await readFile(
+  new URL('../migrations/0003_ai_roles.sql', import.meta.url),
+  'utf8',
+);
 class D1 {
   constructor() {
     this.queries = 0;
     this.sql = new DatabaseSync(':memory:');
     this.sql.exec(migration);
     this.sql.exec(editorMigration);
+    this.sql.exec(roleMigration);
   }
   prepare(query) {
     this.queries++;
@@ -159,6 +164,13 @@ globalThis.fetch = async (input, options) => {
                           ? {
                               ...answer,
                               products: [],
+                              terms: [
+                                {
+                                  original: 'ceramide',
+                                  japanese: 'セラミド',
+                                  language: 'en',
+                                },
+                              ],
                               ingredients: ['セラミド'],
                               claims: [
                                 {
@@ -553,15 +565,12 @@ test('生成JSONの再試行は1回だけ、失敗は記録', async () => {
     invalidJson = false;
   }
 });
-test('Gemini制限時は文章だけ代替モデルへ、成功結果も再利用', async () => {
-  const e = env();
+test('Gemini制限時は要約を待機し、Workers AIで文章を生成しない', async () => {
+  const e = env({ SUMMARY_PROVIDER: 'workers' }),
+    before = fallbackCalls;
   geminiQuota = true;
-  const before = fallbackCalls;
   try {
-    const result = await summarize(e, '肌の乾燥の情報です');
-    assert.ok(result.model.includes('qwen'));
-    await summarize(e, '肌の乾燥の情報です');
-    assert.equal(fallbackCalls - before, 1);
+    await assert.rejects(summarize(e, '保湿の要約'), /gemini_quota/);
     await assert.rejects(
       summarize(e, '動画', {
         url: 'https://www.youtube.com/watch?v=abcdefghijk',
@@ -569,6 +578,7 @@ test('Gemini制限時は文章だけ代替モデルへ、成功結果も再利�
       }),
       /gemini_quota/,
     );
+    assert.equal(fallbackCalls, before);
   } finally {
     geminiQuota = false;
   }
@@ -674,6 +684,8 @@ test('動画の詳細と短い要約を1回で保存し、再処理しても生�
   assert.equal(row.ai_status, 'complete');
   const result = JSON.parse(row.raw_summary);
   assert.equal(result.ingredients[0], 'セラミド');
+  assert.equal(result.terms[0].original, 'ceramide');
+  assert.equal(result.terms[0].japanese, 'セラミド');
   assert.equal(result.timestamps[0].time, '0:15');
   assert.equal(row.summary, result.summary);
   assert.equal(geminiCalls - before, 1);
@@ -748,12 +760,9 @@ test('同時の同じ要約処理はキャッシュのロックで1回にする'
   ]);
   assert.equal(geminiCalls - before, 1);
   assert.ok(results.some((r) => r.status === 'fulfilled'));
-  assert.ok(
-    results.some(
-      (r) =>
-        r.status === 'rejected' && r.reason.code === 'cache_in_progress',
-    ),
-  );
+  for (const r of results)
+    if (r.status === 'rejected')
+      assert.equal(r.reason.code, 'cache_in_progress');
 });
 
 test('初回のタグ辞書生成もD1無料枠の1処理50クエリ以内', async () => {
@@ -983,195 +992,193 @@ test('停止した編集者を毎回拒否し、管理者の削除や自己昇�
     200,
   );
 });
-test('記事ごとのAIチェックは対象だけ処理し、同じ内容は再利用し、公開しない', async () => {
-  const e = env(),
-    id = await submitted(e);
+
+async function checkRequest(e, id) {
   const row = (
     await request(e, '/api/admin/articles/' + id, 'GET', null, true)
   ).data.article;
-  const before = geminiCalls;
+  return (
+    await request(
+      e,
+      '/api/admin/articles/' + id + '/ai-check',
+      'POST',
+      { revision: row.revision },
+      true,
+    )
+  ).data;
+}
+function grokResult(revision) {
+  return {
+    ...reviewAnswer,
+    revision,
+    ai_check_notes:
+      '一次資料と照合しました。研究条件と効能の断定には注意が必要です。',
+    checked_citations: ['https://example.org/paper'],
+    primary_source_notes: '一次資料の内容と研究条件を確認しました。',
+    pr_notes: 'PRかどうかは原文の開示を確認してください。',
+    terms: [
+      { original: 'ceramide', japanese: 'セラミド', language: 'en' },
+    ],
+  };
+}
+test('Grok再チェックの依頼・取得・返信は公開せず、本文を変えず、重複返信を再利用する', async () => {
+  const e = env(),
+    id = await submitted(e),
+    before = geminiCalls,
+    workers = fallbackCalls;
+  const queued = await checkRequest(e, id);
+  assert.equal(queued.state, 'pending');
+  const list = (await request(e, '/api/ingest/checks?status=pending'))
+    .data;
+  assert.equal(list.requests.length, 1);
+  assert.equal(list.requests[0].id, queued.id);
   assert.equal(
-    (
-      await request(
-        e,
-        '/api/admin/articles/' + id + '/ai-check',
-        'POST',
-        { revision: row.revision },
-        true,
-      )
-    ).response.status,
-    200,
+    list.requests[0].article.body_markdown,
+    article('unused').body_markdown,
   );
+  assert.ok(list.requests[0].article.materials[0].raw_summary);
+  assert.equal(list.requests[0].requested_by, undefined);
+  const payload = grokResult(list.requests[0].revision);
+  const bad = await request(
+    e,
+    '/api/ingest/checks/' + queued.id + '/result',
+    'POST',
+    { ...payload, status: 'published' },
+  );
+  assert.equal(bad.response.status, 400);
   const result = await request(
     e,
-    '/api/admin/articles/' + id + '/ai-run',
+    '/api/ingest/checks/' + queued.id + '/result',
     'POST',
-    { revision: row.revision, kind: 'review' },
-    true,
+    payload,
   );
-  assert.equal(result.data.jobs[0].state, 'complete');
-  assert.equal(geminiCalls - before, 1);
-  let detail = (
-    await request(e, '/api/admin/articles/' + id, 'GET', null, true)
-  ).data;
-  assert.equal(detail.check.stale, false);
-  assert.equal(detail.check.result.findings[0].category, 'evidence');
-  assert.equal(detail.article.status, 'pending_review');
-  assert.equal(detail.article.ai_status, 'queued');
-  assert.equal(
-    e.DB.sql
-      .prepare(
-        "SELECT COUNT(*) n FROM ai_jobs WHERE job_type='enrich' AND state='queued'",
-      )
-      .get().n,
-    2,
-  );
+  assert.equal(result.response.status, 200);
   assert.equal(
     (
       await request(
         e,
-        '/api/admin/articles/' + id + '/ai-check',
+        '/api/ingest/checks/' + queued.id + '/result',
         'POST',
-        { revision: row.revision },
-        true,
+        payload,
       )
     ).data.cached,
     true,
   );
-  assert.equal(geminiCalls - before, 1);
+  const detail = (
+    await request(e, '/api/admin/articles/' + id, 'GET', null, true)
+  ).data;
+  assert.equal(detail.article.status, 'pending_review');
+  assert.equal(
+    detail.article.body_markdown,
+    article('unused').body_markdown,
+  );
+  assert.equal(detail.check.stale, false);
+  assert.equal(detail.check.result.terms[0].original, 'ceramide');
+  assert.equal(detail.article.revision, 2);
+  assert.equal(geminiCalls, before);
+  assert.equal(fallbackCalls, workers);
+  assert.equal((await checkRequest(e, id)).cached, true);
+  assert.equal(
+    (await request(e, '/api/ingest/checks?status=pending')).data.requests
+      .length,
+    0,
+  );
+});
+test('Grokの古い返信は拒否し、編集者の本文やメモを上書きしない', async () => {
+  const e = env(),
+    id = await submitted(e);
+  const queued = await checkRequest(e, id);
   const edit = {
     ...article('unused'),
-    body_markdown: row.body_markdown + '追記です。',
-    revision: row.revision,
+    revision: 1,
+    body_markdown: article('unused').body_markdown + '原文も読みます。',
+    ai_check_notes: '編集者のメモ',
   };
   delete edit.slug;
   delete edit.source_ids;
   await request(e, '/api/admin/articles/' + id, 'PATCH', edit, true);
-  detail = (
-    await request(e, '/api/admin/articles/' + id, 'GET', null, true)
-  ).data;
-  assert.equal(detail.check.stale, true);
   assert.equal(
     (
       await request(
         e,
-        '/api/admin/articles/' + id + '/ai-check',
+        '/api/ingest/checks/' + queued.id + '/result',
         'POST',
-        { revision: row.revision },
-        true,
+        grokResult(1),
       )
     ).response.status,
     409,
   );
+  assert.equal(
+    (await request(e, '/api/ingest/checks?status=pending')).data.requests
+      .length,
+    0,
+  );
+  assert.equal(
+    e.DB.sql
+      .prepare('SELECT state FROM article_checks WHERE id=?')
+      .get(queued.id).state,
+    'obsolete',
+  );
+  assert.match(
+    e.DB.sql
+      .prepare('SELECT ai_check_notes FROM articles WHERE id=?')
+      .get(id).ai_check_notes,
+    /編集者のメモ/,
+  );
 });
-test('長文のチェック範囲を保存し、素材の変更で結果を無効にする', async () => {
-  const e = env({ REVIEW_INPUT_CHARS: '500' }),
+test('Grokには本文全文を渡し、素材の変更で再チェックを必要にする', async () => {
+  const e = env(),
     id = await submitted(e);
   e.DB.sql
     .prepare('UPDATE articles SET body_markdown=? WHERE id=?')
-    .run('保湿の情報。'.repeat(300), id);
-  const row = (
-    await request(e, '/api/admin/articles/' + id, 'GET', null, true)
-  ).data.article;
-  await request(
-    e,
-    '/api/admin/articles/' + id + '/ai-check',
-    'POST',
-    { revision: row.revision },
-    true,
-  );
-  await runJobs(e, { id, kind: 'review' });
-  let check = (
-    await request(e, '/api/admin/articles/' + id, 'GET', null, true)
-  ).data.check;
-  assert.equal(check.reviewed_chars, 500);
-  assert.equal(check.body_chars, 1800);
+    .run('保湿の情報。'.repeat(1000), id);
+  const queued = await checkRequest(e, id);
+  const list = (await request(e, '/api/ingest/checks')).data;
+  assert.equal(list.requests[0].article.body_markdown.length, 6000);
   e.DB.sql
-    .prepare("UPDATE sources SET raw_summary='素材が更新されました。'")
+    .prepare("UPDATE sources SET raw_summary='新しい素材です'")
     .run();
-  check = (
-    await request(e, '/api/admin/articles/' + id, 'GET', null, true)
-  ).data.check;
-  assert.equal(check.stale, true);
+  assert.equal(
+    (
+      await request(
+        e,
+        '/api/ingest/checks/' + queued.id + '/result',
+        'POST',
+        grokResult(1),
+      )
+    ).response.status,
+    409,
+  );
+  assert.equal(
+    (await request(e, '/api/ingest/checks')).data.requests.length,
+    0,
+  );
 });
-test('古い版のAIチェックに費用を使わず、予算超過は要約ステータスを壊さない', async () => {
+test('Grok依頼の登録はAI予算を使わず、内部モデルによる審査を実行しない', async () => {
   const e = env({ AI_DAILY_CALL_LIMIT: '0' }),
     id = await submitted(e);
-  const row = (
-    await request(e, '/api/admin/articles/' + id, 'GET', null, true)
-  ).data.article;
-  await request(
-    e,
-    '/api/admin/articles/' + id + '/ai-check',
-    'POST',
-    { revision: row.revision },
-    true,
-  );
-  const before = geminiCalls;
-  const result = await runJobs(e, { id, kind: 'review' });
-  assert.equal(result[0].code, 'daily_budget');
-  assert.equal(geminiCalls, before);
+  await checkRequest(e, id);
   assert.equal(
-    e.DB.sql.prepare('SELECT ai_status FROM articles WHERE id=?').get(id)
-      .ai_status,
-    'queued',
-  );
-  e.DB.sql
-    .prepare(
-      "UPDATE ai_jobs SET state='queued',next_attempt_at='2000-01-01' WHERE job_type='review'",
-    )
-    .run();
-  e.DB.sql
-    .prepare(
-      "UPDATE articles SET body_markdown='更新後の本文' WHERE id=?",
-    )
-    .run(id);
-  await runJobs(e, { id, kind: 'review' });
-  assert.equal(geminiCalls, before);
-  assert.equal(
-    e.DB.sql
-      .prepare("SELECT state FROM ai_jobs WHERE job_type='review'")
-      .get().state,
-    'obsolete',
-  );
-});
-test('AIチェックのJSON失敗は1回だけ再試行し、編集履歴と別に記録する', async () => {
-  const e = env(),
-    id = await submitted(e),
-    before = geminiCalls;
-  const row = (
-    await request(e, '/api/admin/articles/' + id, 'GET', null, true)
-  ).data.article;
-  await request(
-    e,
-    '/api/admin/articles/' + id + '/ai-check',
-    'POST',
-    { revision: row.revision },
-    true,
-  );
-  invalidJson = true;
-  try {
-    const result = await runJobs(e, { id, kind: 'review' });
-    assert.equal(result[0].code, 'invalid_review_json');
-  } finally {
-    invalidJson = false;
-  }
-  assert.equal(geminiCalls - before, 2);
-  assert.equal(
-    e.DB.sql
-      .prepare(
-        "SELECT COUNT(*) n FROM review_events WHERE action='ai_check_requested'",
+    (
+      await request(
+        e,
+        '/api/admin/articles/' + id + '/ai-run',
+        'POST',
+        { revision: 1, kind: 'review' },
+        true,
       )
+    ).response.status,
+    400,
+  );
+  assert.equal(
+    e.DB.sql
+      .prepare("SELECT COUNT(*) n FROM ai_jobs WHERE job_type='review'")
       .get().n,
-    1,
+    0,
   );
   assert.equal(
-    e.DB.sql
-      .prepare(
-        'SELECT COUNT(*) n FROM article_versions WHERE article_id=?',
-      )
-      .get(id).n,
-    1,
+    e.DB.sql.prepare('SELECT COUNT(*) n FROM daily_budget').get().n,
+    0,
   );
 });
 test('編集の各版を保存し、同じ古い版による上書きを拒否する', async () => {
@@ -1231,4 +1238,142 @@ test('失敗した要約の状態を更新し、AIチェック失敗では変え
       .ai_status,
     'failed',
   );
+});
+
+test('停止後の削除でメールを無効化し、利用中・管理者の削除は拒否する', async () => {
+  const e = env();
+  await request(
+    e,
+    '/api/admin/editors',
+    'POST',
+    { email: 'editor@example.test', active: true },
+    true,
+  );
+  assert.equal(
+    (
+      await request(
+        e,
+        '/api/admin/editors',
+        'DELETE',
+        { email: 'editor@example.test' },
+        true,
+      )
+    ).response.status,
+    409,
+  );
+  assert.equal(
+    (
+      await request(
+        e,
+        '/api/admin/editors',
+        'DELETE',
+        { email: 'admin@example.test' },
+        true,
+      )
+    ).response.status,
+    400,
+  );
+  assert.equal(
+    (
+      await request(
+        e,
+        '/api/admin/editors',
+        'DELETE',
+        { email: 'editor@example.test' },
+        'editor',
+      )
+    ).response.status,
+    403,
+  );
+  await request(
+    e,
+    '/api/admin/editors',
+    'POST',
+    { email: 'editor@example.test', active: false },
+    true,
+  );
+  assert.equal(
+    (
+      await request(
+        e,
+        '/api/admin/editors',
+        'DELETE',
+        { email: 'editor@example.test' },
+        true,
+      )
+    ).response.status,
+    200,
+  );
+  assert.equal(
+    (await request(e, '/api/admin/me', 'GET', null, 'editor')).response
+      .status,
+    403,
+  );
+  assert.equal(
+    e.DB.sql.prepare('SELECT COUNT(*) n FROM editors').get().n,
+    0,
+  );
+  assert.equal(
+    e.DB.sql
+      .prepare(
+        "SELECT COUNT(*) n FROM editor_events WHERE action='deleted'",
+      )
+      .get().n,
+    1,
+  );
+});
+test('海外の文章素材には生成モデルを呼ばず、タグだけ埋め込みで処理する', async () => {
+  const e = env(),
+    before = geminiCalls;
+  const s = await request(e, '/api/ingest/sources', 'POST', {
+    ...source,
+    language: 'ko',
+  });
+  await runJobs(e);
+  assert.equal(geminiCalls, before);
+  const row = e.DB.sql
+    .prepare('SELECT * FROM sources WHERE id=?')
+    .get(s.data.id);
+  assert.equal(row.raw_summary, source.raw_summary);
+  assert.equal(row.summary_model, null);
+  assert.equal(row.ai_status, 'complete');
+});
+test('類似記事は公開承認済みの最新埋め込みだけを最大5件返し、AIを再計算しない', async () => {
+  const e = env(),
+    id = await submitted(e);
+  await processAll(e);
+  const sourceId = e.DB.sql
+    .prepare('SELECT id FROM sources LIMIT 1')
+    .get().id;
+  for (let n = 0; n < 7; n++) {
+    const row = { ...article(sourceId), slug: 'related-' + n };
+    const created = await request(e, '/api/ingest/articles', 'POST', row);
+    await processAll(e);
+    if (n < 6) {
+      const rev = e.DB.sql
+        .prepare('SELECT revision FROM articles WHERE id=?')
+        .get(created.data.id).revision;
+      await request(
+        e,
+        '/api/admin/articles/' + created.data.id + '/review',
+        'POST',
+        { status: 'published', revision: rev, confirmed: true },
+        true,
+      );
+    }
+  }
+  const before = geminiCalls,
+    result = await request(
+      e,
+      '/api/admin/articles/' + id + '/related',
+      'GET',
+      null,
+      true,
+    );
+  assert.equal(result.data.articles.length, 5);
+  assert.equal(
+    result.data.articles.some((a) => a.slug === 'related-6'),
+    false,
+  );
+  assert.equal(geminiCalls, before);
 });

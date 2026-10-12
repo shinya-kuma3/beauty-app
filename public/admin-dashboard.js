@@ -6,6 +6,7 @@ let current = null,
   identity = null,
   listed = [];
 const states = {
+  pending: 'Grok Botの取得・返信待ち',
   queued: '処理待ち',
   processing: '処理中',
   deferred: '翌日または次回の処理待ち',
@@ -36,6 +37,7 @@ const messages = {
     '操作の回数制限に達しました。少し待ってから再試行してください。',
   youtube_discovery_failed:
     '動画を取得できませんでした。YouTube APIの設定と制限を確認してください。',
+  editor_must_be_inactive: '削除する前に編集者の利用を停止してください。',
   database_not_configured: 'データベースの設定が必要です。',
   bootstrap_admin_immutable: '管理者の権限はこの画面から変更できません。',
 };
@@ -116,8 +118,8 @@ function updateActions() {
     dirty;
   $('reject').disabled =
     busy || !editable || !$('confirm').checked || dirty;
-  const applyTags=$('apply-ai-tags');
-  if(applyTags) applyTags.disabled=busy||!editable;
+  const applyTags = $('apply-ai-tags');
+  if (applyTags) applyTags.disabled = busy || !editable;
   $('review-actions').hidden = !editable;
   for (const id of ['ai-check', 'ai-enrich'])
     $(id).disabled = busy || !editable || dirty;
@@ -188,7 +190,7 @@ function renderCheck(check) {
   $('check-result').replaceChildren();
   if (!check) {
     $('check-state').textContent =
-      'まだAIチェックをしていません。修正を保存してから実行してください。';
+      'Grok Botの再チェック依頼はまだありません。現在の信頼性メモは編集欄で確認できます。';
     return;
   }
   $('check-state').textContent =
@@ -223,11 +225,32 @@ function renderCheck(check) {
         check.reviewed_chars.toLocaleString() +
         ' / ' +
         check.body_chars.toLocaleString() +
-        '文字。素材は短く抜粋しています。出典リンクの原文は未確認です。',
+        '文字をGrok Botへの依頼に含めました。以下はBotが返した確認結果です。編集者も原文を確認してください。',
     ),
     el('p', date(check.completed_at) + ' ・ ' + check.model, 'hint'),
   );
   $('check-result').append(scope, el('p', check.result.overview));
+  for (const [label, value] of [
+    ['一次情報の確認', check.result.primary_source_notes],
+    ['PR・利益相反', check.result.pr_notes],
+  ])
+    if (value) $('check-result').append(el('h3', label), el('p', value));
+  if (check.result.terms?.length) {
+    $('check-result').append(el('h3', '専門用語の原語'));
+    for (const term of check.result.terms)
+      $('check-result').append(
+        el(
+          'p',
+          term.japanese +
+            ' / ' +
+            term.original +
+            '（' +
+            term.language +
+            '）',
+        ),
+      );
+  }
+
   const categories = {
     claim: '断定表現',
     evidence: '根拠',
@@ -283,7 +306,7 @@ function renderSummary() {
       $('message').textContent =
         'タグを編集欄に入れました。内容を確認して保存してください。';
     };
-    b.id='apply-ai-tags';
+    b.id = 'apply-ai-tags';
     b.disabled = current.status !== 'pending_review';
     target.append(b);
   }
@@ -327,6 +350,7 @@ async function openArticle(id) {
     li.append(a);
     $('citations').append(li);
   }
+  $('related-results').replaceChildren();
   $('sources').replaceChildren();
   for (const source of data.sources) {
     const d = el('details'),
@@ -346,7 +370,9 @@ async function openArticle(id) {
     edited: '記事を編集',
     published: '公開を承認',
     rejected: '却下',
-    ai_check_requested: 'AIチェックを依頼',
+    ai_check_requested: '以前のAIチェックを依頼',
+    grok_check_requested: 'Grok Botに再チェックを依頼',
+    grok_check_completed: 'Grok Botの確認結果を受け取り',
   };
   $('history').replaceChildren();
   for (const event of [...data.events].reverse()) {
@@ -425,7 +451,11 @@ async function members() {
   for (const email of data.admins)
     $('members').append(el('p', email + ' ・ 管理者', 'hint'));
   for (const member of data.editors) {
-    const row = el('div', undefined, 'member-row');
+    const row = el(
+      'div',
+      undefined,
+      'member-row' + (member.active ? '' : ' inactive'),
+    );
     const b = el(
       'button',
       member.active ? '利用を停止' : '利用を再開',
@@ -447,6 +477,24 @@ async function members() {
       ),
       b,
     );
+    if (!member.active) {
+      const remove = el('button', '削除', 'secondary');
+      remove.onclick = () => {
+        if (
+          !confirm(
+            member.email +
+              ' を編集者一覧から削除しますか？このメールでサイトの操作はできなくなります。過去の審査履歴は残ります。',
+          )
+        )
+          return;
+        action(async () => {
+          await api('editors', 'DELETE', { email: member.email });
+          await members();
+          return '編集者を削除しました。Cloudflare Accessの許可メールからも削除してください。';
+        });
+      };
+      row.append(remove);
+    }
     $('members').append(row);
   }
 }
@@ -624,25 +672,44 @@ function jobMessage(result) {
 }
 $('ai-check').onclick = () =>
   action(async () => {
-    if (dirty)
-      throw new Error('修正を保存してからチェックしてください。');
-    const queued = await api(
+    if (dirty) throw new Error('修正を保存してから依頼してください。');
+    const result = await api(
       'articles/' + current.id + '/ai-check',
       'POST',
-      {
-        revision: current.revision,
-      },
+      { revision: current.revision },
     );
-    let message = '同じ内容のチェック結果を再利用しました。';
-    if (!queued.cached)
-      message = jobMessage(
-        await api('articles/' + current.id + '/ai-run', 'POST', {
-          revision: current.revision,
-          kind: 'review',
-        }),
-      );
     await openArticle(current.id);
-    return message;
+    return result.cached
+      ? '同じ内容のGrok Botの結果を再利用しました。'
+      : 'Grok Botへの依頼を登録しました。BotがAPIから取得し、返信すると結果が表示されます。';
+  });
+$('related').onclick = () =>
+  action(async () => {
+    const data = await api('articles/' + current.id + '/related');
+    $('related-results').replaceChildren();
+    for (const a of data.articles) {
+      const button = el('button', a.title, 'secondary');
+      button.onclick = () => {
+        if (
+          dirty &&
+          !confirm('未保存の変更があります。この記事を開きますか？')
+        )
+          return;
+        action(() => openArticle(a.id));
+      };
+      $('related-results').append(
+        button,
+        el('p', a.tags.join(' / '), 'hint'),
+      );
+    }
+    if (!data.articles.length)
+      $('related-results').append(
+        el(
+          'p',
+          '比較できる公開承認済み記事の埋め込みがまだありません。',
+          'hint',
+        ),
+      );
   });
 $('ai-enrich').onclick = () =>
   action(async () => {

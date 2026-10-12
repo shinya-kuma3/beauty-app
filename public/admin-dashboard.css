@@ -492,3 +492,6 @@ button:focus-visible {
     transition: none !important;
   }
 }
+
+.member-row.inactive > span { color:#8296a5; }
+#related-results button { display:block;margin:12px 0 6px; }

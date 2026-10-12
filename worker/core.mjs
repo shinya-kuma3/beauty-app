@@ -21,7 +21,8 @@ export async function secureEqual(left, right) {
   if (!left || !right) return false;
   const [a, b] = await Promise.all([hash(left), hash(right)]);
   let diff = 0;
-  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  for (let i = 0; i < a.length; i++)
+    diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
   return diff === 0;
 }
 export function normalizeUrl(value) {
@@ -81,10 +82,24 @@ export const editInput = articleInput
   .extend({ revision: z.number().int().positive() })
   .strict();
 export const summarySchema = z
-  .object({ summary: text(200), key_points: z.array(text(60)).min(1).max(3) })
+  .object({
+    summary: text(200),
+    key_points: z.array(text(60)).min(1).max(3),
+  })
   .strict();
 export const videoSchema = summarySchema
   .extend({
+    terms: z
+      .array(
+        z
+          .object({
+            original: text(100),
+            japanese: text(100),
+            language: text(20),
+          })
+          .strict(),
+      )
+      .max(20),
     products: z.array(text(150)).max(8),
     ingredients: z.array(text(100)).max(12),
     claims: z
@@ -166,7 +181,11 @@ export function reviewFlags(row) {
   flags.push('出典が各主張を支えるか、管理者が原文を確認してください。');
   return flags;
 }
-const md = new MarkdownIt({ html: false, linkify: false, typographer: false });
+const md = new MarkdownIt({
+  html: false,
+  linkify: false,
+  typographer: false,
+});
 md.disable('image');
 md.validateLink = (link) => {
   try {
@@ -180,7 +199,8 @@ export function decode(row) {
   if (!row) return null;
   const out = { ...row };
   for (const field of ['tags', 'citations', 'key_points', 'ai_tags'])
-    if (field in out) out[field] = out[field] ? JSON.parse(out[field]) : [];
+    if (field in out)
+      out[field] = out[field] ? JSON.parse(out[field]) : [];
   return out;
 }
 export async function enqueue(db, type, id, content_hash) {
