@@ -116,6 +116,8 @@ function updateActions() {
     dirty;
   $('reject').disabled =
     busy || !editable || !$('confirm').checked || dirty;
+  const applyTags=$('apply-ai-tags');
+  if(applyTags) applyTags.disabled=busy||!editable;
   $('review-actions').hidden = !editable;
   for (const id of ['ai-check', 'ai-enrich'])
     $(id).disabled = busy || !editable || dirty;
@@ -281,6 +283,7 @@ function renderSummary() {
       $('message').textContent =
         'タグを編集欄に入れました。内容を確認して保存してください。';
     };
+    b.id='apply-ai-tags';
     b.disabled = current.status !== 'pending_review';
     target.append(b);
   }
