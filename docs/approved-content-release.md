@@ -15,7 +15,7 @@ Grok BotにはGitHubへの書き込み権限や本番公開のAPIキーを渡し
 
 ## Cloudflareの構成
 
-- `wrangler.jsonc`：本体の静的アセット専用Worker、beauty-app。mainとdevelopの通常ビルドで使用します。D1、AI、実行スクリプトはありません。
+- `wrangler.jsonc`：本体の静的アセット専用Worker、beauty-app。mainとdevelopの通常ビルドで使用します。D1、AI、実行スクリプトはありません。`preview_urls: true`でdevelopと管理用Previewのworkers.dev URLを維持します。
 - `wrangler.mens.jsonc`：メンズの静的サイト、beauty-app-mens。共通記事は本体へリンクします。
 - `wrangler.pipeline.jsonc`：D1・Access・AI・収集APIを持つ管理Workerの設定。既存のcodex/content-review-pipeline Previewを継続利用します。
 - 管理画面・Bot/API： https://codex-content-review-pipeline-beauty-app.sinyak4649.workers.dev/
