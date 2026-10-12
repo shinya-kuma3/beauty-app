@@ -1,3 +1,14 @@
+import {
+  approvedFiles,
+  requestRelease,
+  getRelease,
+  pendingReleases,
+  completeRelease,
+  markReleased,
+  markReleaseBuild,
+  outstandingBuilds,
+  unconfirmedReleases,
+} from './releases.mjs';
 import { articleList, filterOptions } from './article-search.mjs';
 import { Hono } from 'hono';
 import { z } from 'zod';
@@ -47,7 +58,7 @@ const app = new Hono<{
   Variables: { admin: string; role: string };
 }>();
 const jwks = new Map<string, ReturnType<typeof createRemoteJWKSet>>();
-async function json(c: any) {
+async function json(c: any, limit = 262144) {
   if (!c.req.header('Content-Type')?.startsWith('application/json'))
     throw new ApiError(415, 'json_required');
   const reader = c.req.raw.body?.getReader();
@@ -58,7 +69,7 @@ async function json(c: any) {
     const { done, value } = await reader.read();
     if (done) break;
     size += value.length;
-    if (size > 262144) {
+    if (size > limit) {
       await reader.cancel();
       throw new ApiError(413, 'request_too_large');
     }
@@ -664,6 +675,45 @@ app.patch('/api/admin/articles/:id', async (c) => {
     throw new ApiError(409, 'revision_conflict');
   return c.json({ id, revision: data.revision + 1 });
 });
+app.post('/api/admin/articles/:id/revise', async (c) => {
+  const data = parse(
+    z.object({ revision: z.number().int().positive() }).strict(),
+    await json(c),
+  );
+  const id = c.req.param('id'),
+    time = now(),
+    token = crypto.randomUUID();
+  const row: any = await c.env.DB.prepare(
+    "SELECT content_hash FROM articles WHERE id=? AND revision=? AND status='published'",
+  )
+    .bind(id, data.revision)
+    .first();
+  if (!row) throw new ApiError(409, 'revision_conflict');
+  const result = await c.env.DB.batch([
+    c.env.DB.prepare(
+      "UPDATE articles SET status='draft',revision=revision+1,published_at=NULL,reviewed_by=NULL,updated_at=?,ai_status='queued',mutation_token=? WHERE id=? AND revision=? AND status='published'",
+    ).bind(time, token, id, data.revision),
+    c.env.DB.prepare(
+      "UPDATE articles SET status='pending_review' WHERE id=? AND mutation_token=? AND status='draft'",
+    ).bind(id, token),
+    c.env.DB.prepare(
+      "INSERT INTO review_events(article_id,actor,action,revision,created_at) SELECT id,?,'revision_started',revision,? FROM articles WHERE id=? AND mutation_token=?",
+    ).bind(c.get('admin'), time, id, token),
+    c.env.DB.prepare(
+      "INSERT OR IGNORE INTO ai_jobs(id,entity_type,entity_id,content_hash,next_attempt_at,created_at) SELECT ?,'article',id,content_hash,?,? FROM articles WHERE id=? AND mutation_token=?",
+    ).bind(crypto.randomUUID(), time, time, id, token),
+    c.env.DB.prepare(
+      "UPDATE ai_jobs SET state='queued',attempts=0,next_attempt_at=?,lease_until=NULL,error_code=NULL WHERE entity_type='article' AND entity_id=? AND content_hash=? AND EXISTS(SELECT 1 FROM articles WHERE id=? AND mutation_token=?)",
+    ).bind(time, id, row.content_hash, id, token),
+  ]);
+  if (!result[0].meta.changes)
+    throw new ApiError(409, 'revision_conflict');
+  return c.json({
+    id,
+    status: 'pending_review',
+    revision: data.revision + 1,
+  });
+});
 app.post('/api/admin/articles/:id/review', async (c) => {
   const body = await json(c);
   if (
@@ -837,6 +887,43 @@ app.patch('/api/admin/channels/:id', async (c) => {
   if (!result.meta.changes) throw new ApiError(404, 'channel_not_found');
   return c.json({ enabled: body.enabled });
 });
+app.use('/api/release/*', async (c, next) => {
+  if (
+    !(await secureEqual(
+      c.req.header('Authorization'),
+      c.env.RELEASE_API_KEY ? 'Bearer ' + c.env.RELEASE_API_KEY : null,
+    ))
+  )
+    throw new ApiError(401, 'unauthorized');
+  await next();
+});
+app.get('/api/release/articles', async (c) =>
+  c.json(await approvedFiles(c.env, c.req.query('cursor') || '')),
+);
+app.post('/api/release/requests', async (c) =>
+  c.json(await requestRelease(c.env, await json(c, 2097152))),
+);
+app.get('/api/release/reconcile', async (c) =>
+  c.json(await unconfirmedReleases(c.env)),
+);
+app.get('/api/release/builds', async (c) =>
+  c.json(await outstandingBuilds(c.env)),
+);
+app.get('/api/release/requests/:id', async (c) =>
+  c.json(await getRelease(c.env, c.req.param('id'))),
+);
+app.post('/api/release/requests/:id/published', async (c) =>
+  c.json(await markReleased(c.env, c.req.param('id'), await json(c))),
+);
+app.post('/api/release/requests/:id/build', async (c) =>
+  c.json(await markReleaseBuild(c.env, c.req.param('id'), await json(c))),
+);
+app.get('/api/ingest/releases', async (c) =>
+  c.json(await pendingReleases(c.env)),
+);
+app.post('/api/ingest/releases/:id/result', async (c) =>
+  c.json(await completeRelease(c.env, c.req.param('id'), await json(c))),
+);
 app.get('/api/published/export', async (c) => {
   if (
     !(await secureEqual(

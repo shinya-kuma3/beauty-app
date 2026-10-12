@@ -23,6 +23,11 @@ const states = {
   pending_review: '確認待ち',
   published: '公開承認済み',
   rejected: '却下',
+  waiting_github_sync: 'GitHubのdevelop同期待ち',
+  waiting_grok_release: '本番差分のGrok確認待ち',
+  waiting_main_push: 'main反映待ち',
+  release_blocked: 'Grokの指摘で本番反映を停止',
+  waiting_static_build: '本番の静的ビルド待ち',
   building: 'サイトへ反映中',
   deployed: 'サイトへ反映済み',
   waiting_configuration: '公開設定待ち',
@@ -115,6 +120,8 @@ async function action(task) {
 }
 function updateActions() {
   if (!current) return;
+  $('start-revision').hidden = current.status !== 'published';
+  $('start-revision').disabled = busy;
   const editable = current.status === 'pending_review';
   for (const f of $('editor').elements) f.disabled = busy || !editable;
   $('publish').disabled =
@@ -822,6 +829,22 @@ $('status').onchange = () => {
   }
   previousStatus = $('status').value;
   action(applySearch);
+};
+$('start-revision').onclick = () => {
+  if (
+    !confirm(
+      '公開中の記事を残したまま、改訂版を作成しますか？改訂版は再び公開承認とGrokの本番差分確認が必要です。',
+    )
+  )
+    return;
+  action(async () => {
+    await api('articles/' + current.id + '/revise', 'POST', {
+      revision: current.revision,
+    });
+    await list();
+    await openArticle(current.id);
+    return '改訂版を作成しました。現在の公開記事は、新しい版の審査が完了するまでそのままです。';
+  });
 };
 $('retry-build').onclick = () =>
   action(async () => {

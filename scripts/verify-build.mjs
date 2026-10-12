@@ -1,4 +1,4 @@
-import { readFile, access } from 'node:fs/promises';
+import { readFile, access, readdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import assert from 'node:assert/strict';
 import { loadRecords } from './validate-content.mjs';
@@ -59,6 +59,71 @@ for (const result of allMatches()) {
 }
 // Exercise the scripts against the actual generated public page.
 const { Window } = await import('happy-dom');
+const { renderMarkdown } = await import('../worker/core.mjs');
+const { parseSnapshot, digest } =
+  await import('../shared/release-content.mjs');
+for (const folder of ['approved-articles', 'generated-articles']) {
+  let files = [];
+  try {
+    files = await readdir('src/content/' + folder);
+  } catch (error) {
+    if (error.code !== 'ENOENT') throw error;
+  }
+  for (const name of files.filter((f) => f.endsWith('.json'))) {
+    const content = await readFile(
+        'src/content/' + folder + '/' + name,
+        'utf8',
+      ),
+      snapshot = parseSnapshot(content);
+    const entry = manifest.articles.find(
+      (row) =>
+        row.id === snapshot.dbId &&
+        row.revision === snapshot.reviewRevision,
+    );
+    if (!entry) continue;
+    if (entry.sha) assert.equal(entry.sha, await digest(content));
+    const detail = new Window({
+      settings: {
+        disableJavaScriptFileLoading: true,
+        disableCSSFileLoading: true,
+      },
+    });
+    try {
+      detail.document.write(
+        await readFile(
+          'dist/articles/' + name.slice(0, -5) + '/index.html',
+          'utf8',
+        ),
+      );
+      assert.equal(
+        detail.document.querySelector('h1').textContent,
+        snapshot.title,
+      );
+      const expected = detail.document.createElement('div');
+      expected.innerHTML = renderMarkdown(snapshot.bodyMarkdown);
+      assert.equal(
+        detail.document
+          .querySelector('.markdown-body')
+          .textContent.replace(/\s+/g, ' ')
+          .trim(),
+        expected.textContent.replace(/\s+/g, ' ').trim(),
+        'Rendered article differs from approved Markdown',
+      );
+      for (const source of snapshot.sources)
+        assert.ok(
+          [...detail.document.querySelectorAll('a')].some(
+            (a) => a.getAttribute('href') === source.url,
+          ),
+        );
+      assert.match(
+        detail.document.querySelector('.detail-note').textContent,
+        /AI/,
+      );
+    } finally {
+      await detail.happyDOM.close();
+    }
+  }
+}
 const window = new Window({
   url: 'https://example.test/articles/',
   settings: {

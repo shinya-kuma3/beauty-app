@@ -14,7 +14,9 @@ if (
   throw new Error(
     'Use: npm run setup:cloudflare -- --test-id <test D1 database UUID>',
   );
-const config = JSON.parse(await readFile('wrangler.jsonc', 'utf8'));
+const config = JSON.parse(
+  await readFile('wrangler.pipeline.jsonc', 'utf8'),
+);
 if (
   config.previews.d1_databases[0].database_id !== testId &&
   config.previews.d1_databases[0].database_id !==
@@ -24,7 +26,10 @@ if (
 if (testId === config.d1_databases[0].database_id)
   throw new Error('Test and production databases must be different');
 config.previews.d1_databases[0].database_id = testId;
-await writeFile('wrangler.jsonc', JSON.stringify(config, null, 2) + '\n');
+await writeFile(
+  'wrangler.pipeline.jsonc',
+  JSON.stringify(config, null, 2) + '\n',
+);
 const local = {
   ...config,
   name: 'beauty-app-test-local',
@@ -59,6 +64,6 @@ child.on('exit', (code) => {
   process.exitCode = code ?? 1;
   if (code === 0)
     console.log(
-      'Test D1 configured. Commit the updated wrangler.jsonc; keep wrangler.test.local.json private.',
+      'Test D1 configured. Commit the updated wrangler.pipeline.jsonc; keep wrangler.test.local.json private.',
     );
 });

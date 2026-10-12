@@ -42,6 +42,10 @@ const searchMigration = await readFile(
   new URL('../migrations/0004_article_search.sql', import.meta.url),
   'utf8',
 );
+const releaseMigration = await readFile(
+  new URL('../migrations/0005_content_releases.sql', import.meta.url),
+  'utf8',
+);
 class D1 {
   constructor() {
     this.queries = 0;
@@ -50,6 +54,7 @@ class D1 {
     this.sql.exec(editorMigration);
     this.sql.exec(roleMigration);
     this.sql.exec(searchMigration);
+    this.sql.exec(releaseMigration);
   }
   prepare(query) {
     this.queries++;
@@ -1423,4 +1428,336 @@ test('詳細検索と検索候補はAccess認証が必要で、編集者にも�
   );
   assert.equal(bad.response.status, 400);
   assert.match(bad.data.error.message, /検索語/);
+});
+
+async function releaseRequest(e, path, method = 'GET', body) {
+  const response = await app.request(
+    base + '/api/release/' + path,
+    {
+      method,
+      headers: {
+        Authorization: 'Bearer test-release-key',
+        ...(body ? { 'Content-Type': 'application/json' } : {}),
+      },
+      body: body ? JSON.stringify(body) : undefined,
+    },
+    e,
+  );
+  return { response, data: await response.json() };
+}
+async function releaseFixture() {
+  const e = env({
+      RELEASE_API_KEY: 'test-release-key',
+      CONTENT_DELIVERY_MODE: 'github',
+    }),
+    id = await submitted(e);
+  await processAll(e);
+  const row = e.DB.sql
+    .prepare('SELECT * FROM articles WHERE id=?')
+    .get(id);
+  const approved = await request(
+    e,
+    '/api/admin/articles/' + id + '/review',
+    'POST',
+    { revision: row.revision, status: 'published', confirmed: true },
+    true,
+  );
+  assert.equal(approved.response.status, 200);
+  assert.equal(approved.data.publication.state, 'waiting_github_sync');
+  const file = (await releaseRequest(e, 'articles')).data.files[0];
+  const body = {
+    main_base_sha: 'a'.repeat(40),
+    develop_sha: 'b'.repeat(40),
+    changes: [
+      {
+        article_id: id,
+        revision: file.revision,
+        after_sha: file.sha,
+        before_content: null,
+      },
+    ],
+  };
+  const started = await releaseRequest(e, 'requests', 'POST', body);
+  assert.equal(started.response.status, 200);
+  return { e, id, file, started: started.data, body };
+}
+function releasePass(f) {
+  return {
+    digest: f.started.digest,
+    verdict: 'pass',
+    checks: [
+      {
+        article_id: f.id,
+        verdict: 'match',
+        notes: '承認済みの本文・出典とGitの内容が一致しています。',
+      },
+    ],
+    findings: [],
+    summary: '相違はありません。',
+  };
+}
+test('公開承認のない記事は同期せず、Botと同期キーの権限を分離する', async () => {
+  const e = env({ RELEASE_API_KEY: 'test-release-key' });
+  await submitted(e);
+  assert.equal(
+    (await releaseRequest(e, 'articles')).data.files.length,
+    0,
+  );
+  assert.equal(
+    (await request(e, '/api/release/articles')).response.status,
+    401,
+  );
+  assert.equal(
+    (await releaseRequest(e, '../admin/me')).response.status,
+    403,
+  );
+  const f = await releaseFixture();
+  assert.ok(!f.file.content.includes('ai_check_notes'));
+  assert.equal(
+    (
+      await releaseRequest(
+        f.e,
+        'requests/' + f.started.id + '/published',
+        'POST',
+        {
+          digest: f.started.digest,
+          main_base_sha: f.body.main_base_sha,
+          main_sha: 'c'.repeat(40),
+        },
+      )
+    ).response.status,
+    409,
+  );
+  const bot = await request(f.e, '/api/ingest/releases');
+  assert.equal(bot.data.requests.length, 1);
+  assert.equal(bot.data.requests[0].changes[0].content, f.file.content);
+  assert.equal(bot.data.requests[0].changes[0].before_content, null);
+  const mismatch = await releaseRequest(f.e, 'requests', 'POST', {
+    ...f.body,
+    changes: [{ ...f.body.changes[0], after_sha: '0'.repeat(64) }],
+  });
+  assert.equal(mismatch.response.status, 409);
+  const again = await releaseRequest(f.e, 'requests', 'POST', f.body);
+  assert.equal(again.data.id, f.started.id);
+});
+test('Grokの全記事の合格と最新digestがなければmain反映を承認しない', async () => {
+  const f = await releaseFixture();
+  let result = releasePass(f);
+  const bad = await request(
+    f.e,
+    '/api/ingest/releases/' + f.started.id + '/result',
+    'POST',
+    { ...result, digest: '0'.repeat(64) },
+  );
+  assert.equal(bad.response.status, 409);
+  result.findings = [
+    {
+      article_id: f.id,
+      severity: 'warning',
+      reason: '原文を確認できません。',
+    },
+  ];
+  assert.equal(
+    (
+      await request(
+        f.e,
+        '/api/ingest/releases/' + f.started.id + '/result',
+        'POST',
+        result,
+      )
+    ).response.status,
+    400,
+  );
+  result = releasePass(f);
+  const pass = await request(
+    f.e,
+    '/api/ingest/releases/' + f.started.id + '/result',
+    'POST',
+    result,
+  );
+  assert.equal(pass.data.state, 'approved');
+  assert.equal(
+    (
+      await request(
+        f.e,
+        '/api/ingest/releases/' + f.started.id + '/result',
+        'POST',
+        result,
+      )
+    ).data.cached,
+    true,
+  );
+  const final = {
+    digest: f.started.digest,
+    main_base_sha: f.body.main_base_sha,
+    main_sha: 'c'.repeat(40),
+  };
+  assert.equal(
+    (
+      await request(
+        f.e,
+        '/api/release/requests/' + f.started.id + '/published',
+        'POST',
+        final,
+      )
+    ).response.status,
+    401,
+  );
+  assert.equal(
+    (
+      await releaseRequest(
+        f.e,
+        'requests/' + f.started.id + '/published',
+        'POST',
+        final,
+      )
+    ).data.state,
+    'released',
+  );
+  assert.equal(
+    (await releaseRequest(f.e, 'builds')).data.releases.length,
+    1,
+  );
+  assert.equal(
+    (
+      await releaseRequest(
+        f.e,
+        'requests/' + f.started.id + '/build',
+        'POST',
+        {
+          main_sha: final.main_sha,
+          build_id: 'd291053c-b95b-4448-ba8a-d622e7d4b7f8',
+        },
+      )
+    ).data.state,
+    'building',
+  );
+  assert.equal(
+    (await releaseRequest(f.e, 'builds')).data.releases.length,
+    0,
+  );
+  assert.equal(
+    f.e.DB.sql.prepare('SELECT status FROM articles WHERE id=?').get(f.id)
+      .status,
+    'published',
+  );
+});
+test('相違・不明の結果は停止し、後から素材が変わった合格結果も無効化する', async () => {
+  const f = await releaseFixture(),
+    blocked = {
+      ...releasePass(f),
+      verdict: 'block',
+      checks: [
+        {
+          article_id: f.id,
+          verdict: 'uncertain',
+          notes: '原文を確認できません。',
+        },
+      ],
+    };
+  assert.equal(
+    (
+      await request(
+        f.e,
+        '/api/ingest/releases/' + f.started.id + '/result',
+        'POST',
+        blocked,
+      )
+    ).data.state,
+    'rejected',
+  );
+  assert.equal(
+    (
+      await releaseRequest(
+        f.e,
+        'requests/' + f.started.id + '/published',
+        'POST',
+        {
+          digest: f.started.digest,
+          main_base_sha: f.body.main_base_sha,
+          main_sha: 'c'.repeat(40),
+        },
+      )
+    ).response.status,
+    409,
+  );
+  const fresh = await releaseFixture();
+  await request(
+    fresh.e,
+    '/api/ingest/releases/' + fresh.started.id + '/result',
+    'POST',
+    releasePass(fresh),
+  );
+  fresh.e.DB.sql
+    .prepare("UPDATE sources SET raw_summary='内容が変わりました。'")
+    .run();
+  assert.equal(
+    (await releaseRequest(fresh.e, 'requests/' + fresh.started.id))
+      .response.status,
+    409,
+  );
+  assert.equal(
+    fresh.e.DB.sql
+      .prepare('SELECT state FROM content_releases WHERE id=?')
+      .get(fresh.started.id).state,
+    'superseded',
+  );
+});
+test('公開記事の改訂は人の操作だけで作り、再承認前の版を同期APIへ出さない', async () => {
+  const f = await releaseFixture();
+  assert.equal(
+    (
+      await request(
+        f.e,
+        '/api/admin/articles/' + f.id + '/revise',
+        'POST',
+        { revision: f.file.revision },
+      )
+    ).response.status,
+    403,
+  );
+  const result = await request(
+    f.e,
+    '/api/admin/articles/' + f.id + '/revise',
+    'POST',
+    { revision: f.file.revision },
+    true,
+  );
+  assert.equal(result.response.status, 200);
+  assert.equal(result.data.status, 'pending_review');
+  assert.equal(result.data.revision, f.file.revision + 1);
+  assert.equal(
+    (await releaseRequest(f.e, 'articles')).data.files.length,
+    0,
+  );
+  assert.equal(
+    (
+      await request(
+        f.e,
+        '/api/admin/articles/' + f.id + '/revise',
+        'POST',
+        { revision: f.file.revision },
+        true,
+      )
+    ).response.status,
+    409,
+  );
+  assert.equal(
+    (
+      await request(
+        f.e,
+        '/api/ingest/releases/' + f.started.id + '/result',
+        'POST',
+        releasePass(f),
+      )
+    ).response.status,
+    409,
+  );
+  assert.ok(
+    f.e.DB.sql
+      .prepare(
+        'SELECT body_markdown FROM article_versions WHERE article_id=? AND revision=?',
+      )
+      .get(f.id, f.file.revision),
+  );
 });

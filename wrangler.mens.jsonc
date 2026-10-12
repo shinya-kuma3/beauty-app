@@ -1,0 +1,16 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "beauty-app-mens",
+  "compatibility_date": "2026-10-07",
+  "routes": [
+    {
+      "pattern": "mens.my-beauty-palette.com",
+      "custom_domain": true
+    }
+  ],
+  "assets": {
+    "directory": "./dist-mens",
+    "html_handling": "auto-trailing-slash",
+    "not_found_handling": "404-page"
+  }
+}

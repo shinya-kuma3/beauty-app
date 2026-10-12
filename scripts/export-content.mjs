@@ -1,53 +1,26 @@
-import { mkdir, readdir, writeFile, unlink } from 'node:fs/promises';
+import {
+  mkdir,
+  readdir,
+  readFile,
+  writeFile,
+  unlink,
+} from 'node:fs/promises';
 import { resolve, relative } from 'node:path';
 import { z } from 'zod';
-export const exportedArticle = z
-  .object({
-    id: z.uuid(),
-    slug: z
-      .string()
-      .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/)
-      .max(100),
-    title: z.string().min(1).max(120),
-    body_markdown: z.string().min(40).max(50000),
-    excerpt: z.string().min(1).max(300),
-    category: z.enum(['skin', 'hair', 'nail', 'body']),
-    tags: z.array(z.string().min(1).max(30)).max(5),
-    citations: z
-      .array(z.url().refine((v) => new URL(v).protocol === 'https:'))
-      .min(1)
-      .max(20),
-    updated_at: z.iso.datetime(),
-    published_at: z.iso.datetime(),
-    revision: z.number().int().positive(),
-  })
-  .strict();
-export function toStaticArticle(row) {
-  return {
-    title: row.title,
-    summary: row.excerpt,
-    category: row.category,
-    tags: row.tags,
-    status: 'published',
-    updatedAt: row.updated_at.slice(0, 10),
-    sections: [{ heading: '記事本文', body: row.body_markdown }],
-    sources: row.citations.map((url) => ({
-      title: new URL(url).hostname,
-      url,
-      kind: 'reference',
-    })),
-    readingMinutes: Math.min(
-      60,
-      Math.max(1, Math.ceil(row.body_markdown.length / 500)),
-    ),
-    relatedIngredients: [],
-    bodyMarkdown: row.body_markdown,
-    aiAssisted: true,
-    dbId: row.id,
-    reviewRevision: row.revision,
-  };
-}
-export async function exportContent(env = process.env, root = process.cwd()) {
+import {
+  exportedArticle,
+  toStaticArticle,
+  parseSnapshot,
+  digest,
+} from '../shared/release-content.mjs';
+export {
+  exportedArticle,
+  toStaticArticle,
+} from '../shared/release-content.mjs';
+export async function exportContent(
+  env = process.env,
+  root = process.cwd(),
+) {
   const folder = resolve(root, 'src/content/generated-articles');
   await mkdir(folder, { recursive: true });
   for (const name of await readdir(folder)) {
@@ -63,7 +36,11 @@ export async function exportContent(env = process.env, root = process.cwd()) {
     env.WORKERS_CI_BRANCH && env.WORKERS_CI_BRANCH !== 'main'
       ? 'development'
       : env.CONTENT_ENV || 'production';
-  if (env.CONTENT_PIPELINE_ENABLED === 'true') {
+  const live =
+    env.CONTENT_PIPELINE_ENABLED === 'true' &&
+    env.WORKERS_CI_BRANCH !== 'main' &&
+    env.CONTENT_MODE !== 'git';
+  if (live) {
     if (!env.CONTENT_API_URL || !env.CONTENT_EXPORT_KEY)
       throw new Error('Content export URL and key must be configured');
     const url = new URL('/api/published/export', env.CONTENT_API_URL);
@@ -89,12 +66,40 @@ export async function exportContent(env = process.env, root = process.cwd()) {
       throw new Error('Content database environment mismatch');
     rows = z.array(exportedArticle).parse(data.articles);
   }
+  const committed = [];
+  if (!live) {
+    const path = resolve(root, 'src/content/approved-articles');
+    let names = [];
+    try {
+      names = await readdir(path);
+    } catch (error) {
+      if (error.code !== 'ENOENT') throw error;
+    }
+    for (const name of names) {
+      if (name === '.gitkeep') continue;
+      if (!/^[a-z0-9-]+\.json$/.test(name))
+        throw Error('Unexpected approved file');
+      const content = await readFile(resolve(path, name), 'utf8'),
+        article = parseSnapshot(content);
+      committed.push({
+        slug: name.slice(0, -5),
+        id: article.dbId,
+        revision: article.reviewRevision,
+        sha: await digest(content),
+      });
+    }
+  }
   const originals = new Set(
     (await readdir(resolve(root, 'src/content/articles'))).map((f) =>
       f.replace(/\.json$/, ''),
     ),
   );
   const seen = new Set();
+  for (const row of committed) {
+    if (originals.has(row.slug) || seen.has(row.slug))
+      throw Error(`Article slug collision: ${row.slug}`);
+    seen.add(row.slug);
+  }
   for (const row of rows) {
     if (originals.has(row.slug) || seen.has(row.slug))
       throw new Error(`Article slug collision: ${row.slug}`);
@@ -109,8 +114,14 @@ export async function exportContent(env = process.env, root = process.cwd()) {
     resolve(root, 'public/content-manifest.json'),
     JSON.stringify({
       environment: expected,
-      articles: rows.map((row) => ({ id: row.id, revision: row.revision })),
+      articles: live
+        ? rows.map((row) => ({ id: row.id, revision: row.revision }))
+        : committed.map(({ id, revision, sha }) => ({
+            id,
+            revision,
+            sha,
+          })),
     }),
   );
-  return rows.length;
+  return live ? rows.length : committed.length;
 }

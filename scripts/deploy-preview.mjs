@@ -69,7 +69,9 @@ export async function deploy(args = process.argv.slice(2)) {
     );
   }
   const names = previewSecrets(list.stdout, name);
-  const config = JSON.parse(await readFile('wrangler.jsonc', 'utf8'));
+  const config = JSON.parse(
+    await readFile('wrangler.pipeline.jsonc', 'utf8'),
+  );
   config.main = resolve(config.main);
   config.assets.directory = resolve(config.assets.directory);
   config.previews.unsafe = {

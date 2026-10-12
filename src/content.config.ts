@@ -14,14 +14,22 @@ const common = {
   status: z.enum(['draft', 'published']).default('draft'),
   updatedAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   sections: z
-    .array(z.object({ heading: z.string().min(1), body: z.string().min(1) }))
+    .array(
+      z.object({ heading: z.string().min(1), body: z.string().min(1) }),
+    )
     .min(1),
   sources: z
     .array(
       z.object({
         title: z.string().min(1),
         url: z.url({ protocol: /^https$/ }),
-        kind: z.enum(['guideline', 'research', 'official', 'reference', 'x']),
+        kind: z.enum([
+          'guideline',
+          'research',
+          'official',
+          'reference',
+          'x',
+        ]),
       }),
     )
     .min(1),
@@ -38,7 +46,14 @@ const ingredients = defineCollection({
 });
 const articles = defineCollection({
   loader: glob({
-    pattern: ['articles/*.json', 'generated-articles/*.json'],
+    pattern: [
+      'articles/*.json',
+      process.env.CONTENT_PIPELINE_ENABLED === 'true' &&
+      process.env.WORKERS_CI_BRANCH !== 'main' &&
+      process.env.CONTENT_MODE !== 'git'
+        ? 'generated-articles/*.json'
+        : 'approved-articles/*.json',
+    ],
     base: './src/content',
     generateId: ({ entry }) =>
       entry

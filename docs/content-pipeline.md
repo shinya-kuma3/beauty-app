@@ -1,3 +1,5 @@
+> 現在の公開方法は [承認済み記事のGit同期と本番公開](approved-content-release.md) を参照してください。公開サイトは静的配信、管理APIは wrangler.pipeline.jsonc の保護されたWorkerです。以下には旧構成の説明も含まれます。
+
 > **現在のAIの役割は [grok-bot-integration.md](grok-bot-integration.md) を優先してください。** 下記の以前のWorkers AI代替生成・内部AI校正は廃止しました。
 
 # 収集・AI処理・審査・公開

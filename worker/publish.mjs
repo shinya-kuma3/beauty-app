@@ -1,5 +1,18 @@
 import { now } from './core.mjs';
 export async function triggerBuild(env, job) {
+  if (env.CONTENT_DELIVERY_MODE === 'github') {
+    await env.DB.prepare(
+      "UPDATE content_releases SET state='pending',result=NULL,response_hash=NULL,updated_at=? WHERE state='rejected' AND id=(SELECT release_id FROM publication_jobs WHERE id=?)",
+    )
+      .bind(now(), job.id)
+      .run();
+    await env.DB.prepare(
+      "UPDATE publication_jobs SET state='waiting_github_sync',error_code=NULL,updated_at=? WHERE id=?",
+    )
+      .bind(now(), job.id)
+      .run();
+    return { state: 'waiting_github_sync' };
+  }
   if (!env.CONTENT_DEPLOY_HOOK) {
     await env.DB.prepare(
       "UPDATE publication_jobs SET state='waiting_configuration',error_code='deploy_hook_missing',updated_at=? WHERE id=?",
@@ -40,9 +53,20 @@ export async function triggerBuild(env, job) {
 }
 export async function monitorBuilds(env) {
   if (!env.ASSETS) return;
-  const response = await env.ASSETS.fetch(
-    new Request('https://assets.internal/content-manifest.json'),
-  );
+  let response;
+  try {
+    response =
+      env.CONTENT_DELIVERY_MODE === 'github'
+        ? await fetch(
+            'https://my-beauty-palette.com/content-manifest.json',
+            { signal: AbortSignal.timeout(5000) },
+          )
+        : await env.ASSETS.fetch(
+            new Request('https://assets.internal/content-manifest.json'),
+          );
+  } catch {
+    return;
+  }
   if (!response.ok) return;
   let manifest;
   try {
@@ -51,19 +75,26 @@ export async function monitorBuilds(env) {
     return;
   }
   if (
-    manifest.environment !== env.PIPELINE_ENV ||
+    manifest.environment !==
+      (env.CONTENT_DELIVERY_MODE === 'github'
+        ? 'production'
+        : env.PIPELINE_ENV) ||
     !Array.isArray(manifest.articles)
   )
     return;
   const jobs = (
     await env.DB.prepare(
-      "SELECT p.id,a.id AS article_id,a.revision FROM publication_jobs p JOIN articles a ON a.id=p.article_id WHERE p.state!='deployed' LIMIT 100",
+      "SELECT p.id,p.snapshot_hash,a.id AS article_id,a.revision FROM publication_jobs p JOIN articles a ON a.id=p.article_id WHERE p.state!='deployed' LIMIT 100",
     ).all()
   ).results;
   const ready = jobs
     .filter((job) =>
       manifest.articles.some(
-        (a) => a.id === job.article_id && a.revision === job.revision,
+        (a) =>
+          a.id === job.article_id &&
+          a.revision === job.revision &&
+          (env.CONTENT_DELIVERY_MODE !== 'github' ||
+            (job.snapshot_hash && a.sha === job.snapshot_hash)),
       ),
     )
     .slice(0, 50);

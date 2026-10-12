@@ -17,11 +17,12 @@
     "build:mens:local": "npm run validate:content && node scripts/site-command.mjs mens build --local",
     "preview:mens": "node scripts/site-command.mjs mens preview --local",
     "test:subdomains": "node scripts/verify-subdomains.mjs",
-    "dev:worker": "wrangler dev --local --port 8787",
+    "dev:worker": "wrangler dev --config wrangler.pipeline.jsonc --local --port 8787",
     "test:pipeline": "node --test tests/pipeline.test.mjs",
     "setup:cloudflare": "node scripts/setup-cloudflare.mjs",
     "sample:ai": "node scripts/sample-ai.mjs",
-    "deploy:preview": "node scripts/deploy-preview.mjs"
+    "deploy:preview": "node scripts/deploy-preview.mjs",
+    "publish:content": "node scripts/content-release.mjs"
   },
   "dependencies": {
     "astro": "7.3.6",

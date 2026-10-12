@@ -1,0 +1,38 @@
+name: Approved article publication
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '*/15 * * * *'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/content-release.yml'
+      - 'scripts/content-release.mjs'
+      - 'shared/release-content.mjs'
+permissions:
+  contents: write
+concurrency:
+  group: approved-article-publication
+  cancel-in-progress: false
+jobs:
+  publish:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - name: Sync, check and publish approved articles
+        run: npm run publish:content
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_API_KEY: ${{ secrets.RELEASE_API_KEY }}
+          CLOUDFLARE_PRODUCTION_DEPLOY_HOOK: ${{ secrets.CLOUDFLARE_PRODUCTION_DEPLOY_HOOK }}
+          CONTENT_RELEASE_API_URL: ${{ vars.CONTENT_RELEASE_API_URL }}
