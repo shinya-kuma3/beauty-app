@@ -190,8 +190,10 @@ export function searchPlan(params) {
   }
   const tags = [
     ...new Set(
-      (params.get('tags') || '')
-        .split(/[,、]/)
+      (params.getAll('tag').length
+        ? params.getAll('tag')
+        : (params.get('tags') || '').split(/[,、]/)
+      )
         .map((v) => v.trim())
         .filter(Boolean),
     ),
@@ -199,7 +201,7 @@ export function searchPlan(params) {
   if (tags.length > 10 || tags.some((v) => v.length > 30))
     fail('タグは30文字以内、最大10個です。');
   const tagMode = params.get('tag_mode') || 'and';
-  if (!['and', 'or', 'not'].includes(tagMode))
+  if (!['and', 'or'].includes(tagMode))
     fail('タグの条件を確認してください。');
   if (tags.length) {
     const lookups = tags.map((v) => {
@@ -207,25 +209,15 @@ export function searchPlan(params) {
       return 'a.id IN (SELECT article_id FROM article_tags WHERE tag=?)';
     });
     conditions.push(
-      tagMode === 'not'
-        ? 'NOT (' + lookups.join(' OR ') + ')'
-        : '(' + lookups.join(tagMode === 'or' ? ' OR ' : ' AND ') + ')',
+      '(' + lookups.join(tagMode === 'or' ? ' OR ' : ' AND ') + ')',
     );
   }
   function range(start, end) {
     conditions.push('a.' + field + '>=?', 'a.' + field + '<?');
     values.push(start, end);
   }
-  if (params.get('decade')) {
-    const y = yearValue(params.get('decade'));
-    if (y % 10 !== 0 || y > 9980)
-      fail('年代を10年単位で指定してください。');
-    range(utc(y), utc(y + 10));
-  }
-  if (params.get('year')) {
-    const y = yearValue(params.get('year'));
-    range(utc(y), utc(y + 1));
-  }
+  if (params.has('decade') || params.has('year'))
+    fail('年月または開始日・終了日で指定してください。');
   if (params.get('month')) {
     const value = params.get('month');
     if (!/^\d{4}-\d{2}$/.test(value))
@@ -285,7 +277,37 @@ export function searchPlan(params) {
       '))'
     );
   }
-  const ast = parseExpression(params.get('q') || '');
+  let ast;
+  if (params.has('keyword_mode')) {
+    const mode = params.get('keyword_mode');
+    if (!['all', 'any'].includes(mode))
+      fail('キーワードの含め方を確認してください。');
+    const query = params.get('q') || '',
+      excluded = params.get('exclude') || '';
+    if (query.length > 500 || excluded.length > 500)
+      fail('キーワードは各500文字以内です。');
+    const words = query.trim().split(/\s+/).filter(Boolean),
+      without = excluded.trim().split(/\s+/).filter(Boolean);
+    if (words.length + without.length > 12)
+      fail('検索する言葉と含めない言葉は合わせて最大12個です。');
+    const join = (terms, type) =>
+      terms
+        .map((value) => ({ type: 'word', value }))
+        .reduce(
+          (left, right) => (left ? { type, left, right } : right),
+          null,
+        );
+    ast = join(words, mode === 'any' ? 'or' : 'and');
+    const negative = join(without, 'or');
+    if (negative)
+      ast = ast
+        ? {
+            type: 'and',
+            left: ast,
+            right: { type: 'not', value: negative },
+          }
+        : { type: 'not', value: negative };
+  } else ast = parseExpression(params.get('q') || '');
   if (ast) conditions.push(expression(ast));
   const where = conditions.join(' AND '),
     bindings = [...values];
@@ -373,7 +395,7 @@ export async function articleList(env, params) {
 export async function filterOptions(env) {
   const tags = (
     await env.DB.prepare(
-      'SELECT DISTINCT tag FROM article_tags ORDER BY tag COLLATE NOCASE LIMIT 500',
+      "SELECT DISTINCT t.tag FROM article_tags t JOIN articles a ON a.id=t.article_id WHERE a.status!='draft' ORDER BY t.tag COLLATE NOCASE",
     ).all()
   ).results.map((r) => r.tag);
   const dates = await env.DB.prepare(

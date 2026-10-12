@@ -150,7 +150,7 @@ test('全文検索は50件の取得制限より前に行い、AND／OR／NOT・�
     db.sql.close();
   }
 });
-test('タグのAND／OR／NOTは完全一致、部位・状態を合わせて絞り込む', async () => {
+test('選んだタグの含め方は完全一致、部位・状態を合わせて絞り込む', async () => {
   const db = database();
   try {
     insert(db, 'a', { tags: ['スキンケア', '乾燥肌'] });
@@ -177,15 +177,9 @@ test('タグのAND／OR／NOTは完全一致、部位・状態を合わせて絞
       ),
       ['a', 'c'],
     );
-    assert.deepEqual(
-      ids(
-        await search(db, {
-          tags: '乾燥肌',
-          tag_mode: 'not',
-          status: 'all',
-        }),
-      ),
-      ['c', 'd'],
+    await assert.rejects(
+      search(db, { tags: '乾燥肌', tag_mode: 'not' }),
+      (e) => e.status === 400,
     );
     const params = new URLSearchParams({ status: 'all' });
     params.append('category', 'skin');
@@ -208,7 +202,7 @@ test('タグのAND／OR／NOTは完全一致、部位・状態を合わせて絞
     db.sql.close();
   }
 });
-test('年代・年・月・期間は日本時間、終了日を含め、公開日と更新日を選べる', async () => {
+test('年月・期間は日本時間、終了日を含め、公開日と更新日を選べる', async () => {
   const db = database();
   try {
     insert(db, 'before', { created: '2026-09-30T14:59:59.999Z' });
@@ -228,10 +222,6 @@ test('年代・年・月・期間は日本時間、終了日を含め、公開�
     assert.deepEqual(
       ids(await search(db, { from: '2026-10-01', to: '2026-10-31' })),
       ['end', 'start'],
-    );
-    assert.deepEqual(
-      ids(await search(db, { decade: '2020', year: '2026' })),
-      ['after', 'before', 'end', 'start'],
     );
     assert.deepEqual(
       ids(
@@ -255,7 +245,13 @@ test('年代・年・月・期間は日本時間、終了日を含め、公開�
       ['old'],
     );
     assert.deepEqual(
-      ids(await search(db, { year: '2025', month: '2026-10' })),
+      ids(
+        await search(db, {
+          from: '2025-01-01',
+          to: '2025-12-31',
+          month: '2026-10',
+        }),
+      ),
       [],
     );
   } finally {
@@ -367,6 +363,64 @@ test('ワイルドカードやSQLは語句として扱い、不正な式・条�
       searchPlan(
         new URLSearchParams({ from: '2024-02-29', to: '2024-02-29' }),
       ),
+    );
+  } finally {
+    db.sql.close();
+  }
+});
+
+test('普通のキーワードと含め方・除外をSQL条件にし、演算子の文字も語句として検索する', async () => {
+  const db = database();
+  try {
+    insert(db, 'a', {
+      title: 'セラミドの保湿',
+      body: '使い心地',
+      tags: ['保湿,乾燥'],
+    });
+    insert(db, 'b', { title: '保湿と香料', body: '香料' });
+    insert(db, 'c', { title: '髪の洗い方', body: 'ANDという用語' });
+    assert.deepEqual(
+      ids(await search(db, { q: 'セラミド 保湿', keyword_mode: 'all' })),
+      ['a'],
+    );
+    assert.deepEqual(
+      ids(
+        await search(db, {
+          q: 'セラミド 保湿',
+          keyword_mode: 'any',
+          exclude: '香料',
+        }),
+      ),
+      ['a'],
+    );
+    assert.deepEqual(
+      ids(await search(db, { q: 'セラミド 髪', keyword_mode: 'any' })),
+      ['a', 'c'],
+    );
+    assert.deepEqual(
+      ids(await search(db, { q: 'AND', keyword_mode: 'all' })),
+      ['c'],
+    );
+    assert.deepEqual(
+      ids(await search(db, { keyword_mode: 'all', exclude: '香料' })),
+      ['a', 'c'],
+    );
+    const params = new URLSearchParams({
+      tag_mode: 'or',
+      keyword_mode: 'all',
+    });
+    params.append('tag', '保湿,乾燥');
+    assert.deepEqual(ids(await articleList(db, params)), ['a']);
+    await assert.rejects(
+      search(db, { keyword_mode: 'other' }),
+      (e) => e.status === 400,
+    );
+    await assert.rejects(
+      search(db, {
+        keyword_mode: 'all',
+        q: Array(13).fill('単語').join(' '),
+      }),
+      (e) => e.status === 400,
     );
   } finally {
     db.sql.close();

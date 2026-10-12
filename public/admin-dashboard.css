@@ -633,3 +633,28 @@ button.danger:focus-visible {
     gap: 0;
   }
 }
+
+.member-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.member-status {
+  border: 1px solid;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+.member-status.active {
+  color: #216b48;
+  background: #edf8f1;
+  border-color: #b7ddc7;
+}
+.member-status.inactive {
+  color: #a32939;
+  background: #fff0f0;
+  border-color: #e7b0b8;
+}

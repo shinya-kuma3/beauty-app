@@ -2,7 +2,11 @@ const $ = (id) => document.getElementById(id);
 let current = null,
   nextCursor = null,
   total = 0,
-  appliedFilters = new URLSearchParams({ status: 'pending_review' }),
+  appliedFilters = new URLSearchParams({
+    status: 'pending_review',
+    keyword_mode: 'all',
+  }),
+  tagPicker = null,
   dirty = false,
   busy = false,
   identity = null,
@@ -150,7 +154,10 @@ function readFilters() {
       (field.type === 'checkbox' && !field.checked)
     )
       continue;
-    params.append(field.name, field.value.trim());
+    if (field.name === 'selected_tags') {
+      for (const tag of tagPicker.getSelected())
+        params.append('tag', tag);
+    } else params.append(field.name, field.value.trim());
   }
   return params;
 }
@@ -162,35 +169,7 @@ async function applySearch() {
 }
 async function loadFilters() {
   const data = await api('article-filters');
-  $('tag-options').replaceChildren();
-  for (const tag of data.tags) {
-    const option = el('option');
-    option.value = tag;
-    $('tag-options').append(option);
-  }
-  const years = Object.values(data.dates)
-    .filter(Boolean)
-    .map((value) =>
-      Number(
-        new Intl.DateTimeFormat('en', {
-          year: 'numeric',
-          timeZone: 'Asia/Tokyo',
-        }).format(new Date(value)),
-      ),
-    );
-  const newest = Math.max(new Date().getFullYear(), ...years);
-  const oldest = Math.min(newest, ...years);
-  $('search-decade').replaceChildren(el('option', '指定なし'));
-  $('search-decade').firstChild.value = '';
-  for (
-    let year = Math.floor(newest / 10) * 10;
-    year >= Math.floor(oldest / 10) * 10;
-    year -= 10
-  ) {
-    const option = el('option', year + '年代');
-    option.value = String(year);
-    $('search-decade').append(option);
-  }
+  tagPicker.setTags(data.tags);
 }
 async function list(append = false, filters = appliedFilters) {
   const params = new URLSearchParams(filters);
@@ -545,13 +524,16 @@ async function members() {
         return '権限を更新しました。Cloudflare Accessの許可メールも合わせて更新してください。';
       });
     const actions = el('div', undefined, 'member-actions');
-    row.append(
+    const memberInfo = el('span', undefined, 'member-info');
+    memberInfo.append(
+      el('span', member.email),
       el(
         'span',
-        member.email + ' ・ ' + (member.active ? '利用中' : '停止中'),
+        member.active ? '利用中' : '停止中',
+        'member-status ' + (member.active ? 'active' : 'inactive'),
       ),
-      actions,
     );
+    row.append(memberInfo, actions);
     if (!member.active) {
       const remove = el('button', '削除', 'danger');
       remove.onclick = () => {
@@ -658,6 +640,7 @@ async function refresh() {
   )
     return '再読み込みを中止しました。';
   await list();
+  await loadFilters();
   if (identity.role === 'admin') {
     await operations();
     await members();
@@ -707,6 +690,7 @@ $('editor').onsubmit = (e) => {
     });
     dirty = false;
     await list();
+    await loadFilters();
     await openArticle(current.id);
     return '保存しました。本文が変わった場合は要約・タグを処理し、AIチェックもやり直してください。';
   });
@@ -823,6 +807,7 @@ $('article-filters').onsubmit = (e) => {
 };
 $('reset-search').onclick = () => {
   $('article-filters').reset();
+  tagPicker.setSelected([]);
   previousStatus = $('status').value;
   action(applySearch);
 };
@@ -866,7 +851,7 @@ action(async () => {
     (identity.role === 'admin' ? '管理者' : '編集者');
   $('owner-tools').hidden = identity.role !== 'admin';
   $('team-tools').hidden = identity.role !== 'admin';
-  await loadFilters();
+  tagPicker = BeautyTagPicker.create($('admin-tags'));
   await refresh();
   return '記事を選んで編集・確認を始めてください。';
 });

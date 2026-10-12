@@ -7,6 +7,10 @@ const script = await readFile(
   new URL('../public/admin-dashboard.js', import.meta.url),
   'utf8',
 );
+const pickerScript = await readFile(
+  new URL('../public/tag-picker.js', import.meta.url),
+  'utf8',
+);
 const row = {
   id: 'test-article',
   title: '保湿のケア',
@@ -114,6 +118,7 @@ async function setup(role = 'editor', members = []) {
       return Response.json({ jobs: [{ state: 'complete' }] });
     return Response.json({});
   };
+  window.eval(pickerScript);
   window.eval(script);
   await settle();
   return {
@@ -229,6 +234,14 @@ test('停止した編集者だけに削除を表示し、確認後に削除API�
     assert.equal(rows[0].querySelectorAll('button').length, 2);
     assert.equal(rows[1].querySelectorAll('button').length, 1);
     assert.equal(
+      rows[0].querySelector('.member-status.inactive').textContent,
+      '停止中',
+    );
+    assert.equal(
+      rows[1].querySelector('.member-status.active').textContent,
+      '利用中',
+    );
+    assert.equal(
       rows[0].querySelector('.member-actions').firstChild.textContent,
       '削除',
     );
@@ -259,8 +272,18 @@ test('詳細検索をサーバーへ送り、検索しても編集中の本文�
     const body = s.$('editor').elements.body_markdown;
     body.value = '編集中';
     body.dispatchEvent(new s.window.Event('input'));
-    s.$('article-search').value = '(保湿 OR セラミド) AND NOT 香料';
-    s.$('search-tags').value = '乾燥肌, スキンケア';
+    s.$('article-search').value = '保湿 セラミド';
+    s.$('keyword-mode').value = 'any';
+    s.$('exclude-keywords').value = '香料';
+    const picker = s.$('admin-tags');
+    picker.querySelector('[data-tag-open]').click();
+    for (const checkbox of picker.querySelectorAll(
+      '[data-tag-choices] input',
+    )) {
+      checkbox.checked = true;
+      checkbox.dispatchEvent(new s.window.Event('change'));
+    }
+    picker.querySelector('[data-tag-apply]').click();
     s.$('tag-mode').value = 'or';
     s.$('search-month').value = '2026-10';
     s.$('date-basis').value = 'updated';
@@ -274,8 +297,13 @@ test('詳細検索をサーバーへ送り、検索しても編集中の本文�
         .filter((c) => c.path.startsWith('articles?'))
         .at(-1),
       params = new URLSearchParams(call.path.split('?')[1]);
-    assert.equal(params.get('q'), '(保湿 OR セラミド) AND NOT 香料');
-    assert.equal(params.get('tags'), '乾燥肌, スキンケア');
+    assert.equal(params.get('q'), '保湿 セラミド');
+    assert.equal(params.get('keyword_mode'), 'any');
+    assert.equal(params.get('exclude'), '香料');
+    assert.deepEqual(
+      params.getAll('tag').sort(),
+      ['スキンケア', '乾燥肌'].sort(),
+    );
     assert.equal(params.get('tag_mode'), 'or');
     assert.equal(params.get('month'), '2026-10');
     assert.equal(params.get('date_basis'), 'updated');
@@ -283,8 +311,20 @@ test('詳細検索をサーバーへ送り、検索しても編集中の本文�
     assert.equal(body.value, '編集中');
     assert.equal(s.$('save-state').textContent, '未保存の変更あり');
     assert.equal(s.$('article-count').textContent, '1件中 1件表示');
-    assert.equal(s.$('tag-options').children.length, 2);
-    assert.match(s.$('search-decade').textContent, /2010年代/);
+    assert.equal(
+      picker.querySelectorAll('[data-tag-choices] input').length,
+      2,
+    );
+    assert.equal(s.$('search-decade'), null);
+    assert.equal(s.$('search-year'), null);
+    assert.deepEqual(
+      [...s.$('tag-mode').options].map((o) => o.value),
+      ['or', 'and'],
+    );
+    assert.doesNotMatch(
+      s.$('article-filters').textContent,
+      /\b(?:AND|OR|NOT)\b/,
+    );
     s.$('reset-search').click();
     await settle();
     const reset = new URLSearchParams(
@@ -295,6 +335,11 @@ test('詳細検索をサーバーへ送り、検索しても編集中の本文�
     );
     assert.equal(reset.has('q'), false);
     assert.equal(reset.has('month'), false);
+    assert.equal(reset.has('tag'), false);
+    assert.equal(
+      picker.querySelector('[data-tag-selected]').textContent,
+      '指定なし',
+    );
     assert.equal(reset.get('status'), 'pending_review');
     assert.equal(body.value, '編集中');
   } finally {
