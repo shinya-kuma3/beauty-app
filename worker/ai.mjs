@@ -8,6 +8,11 @@ import {
   videoSchema,
 } from './core.mjs';
 import { z } from 'zod';
+import {
+  reviewSchema,
+  reviewInstruction,
+  reviewInput,
+} from './review.mjs';
 export class Deferred extends Error {
   constructor(code) {
     super(code);
@@ -70,7 +75,13 @@ async function finish(env, id, result, outcome) {
   await env.DB.prepare(
     'UPDATE ai_usage SET input_tokens=?,output_tokens=?,usage_estimated=?,outcome=? WHERE id=?',
   )
-    .bind(input, output, input === null || output === null ? 1 : 0, outcome, id)
+    .bind(
+      input,
+      output,
+      input === null || output === null ? 1 : 0,
+      outcome,
+      id,
+    )
     .run();
 }
 const bytes = (value) => new TextEncoder().encode(value).length;
@@ -111,7 +122,9 @@ async function embedLocked(env, texts, keys) {
       .bind(...keys)
       .all()
   ).results;
-  const lookup = new Map(found.map((r) => [r.cache_key, JSON.parse(r.result)]));
+  const lookup = new Map(
+    found.map((r) => [r.cache_key, JSON.parse(r.result)]),
+  );
   const vectors = keys.map((k) => lookup.get(k) ?? null);
   const missing = vectors
     .map((v, i) => (v ? null : i))
@@ -172,7 +185,8 @@ async function tagVectors(env) {
   for (const tag of tags) {
     const descriptionHash = await hash(`${tag.label}:${tag.description}`);
     const match = stored.find(
-      (t) => t.tag_id === tag.id && t.description_hash === descriptionHash,
+      (t) =>
+        t.tag_id === tag.id && t.description_hash === descriptionHash,
     );
     items.push({
       ...tag,
@@ -204,13 +218,24 @@ async function tagVectors(env) {
   }
   return items;
 }
-async function generate(env, provider, model, text, video) {
+async function generate(
+  env,
+  provider,
+  model,
+  text,
+  video,
+  review = false,
+) {
   const cfg = settings(env),
-    schema = video ? videoSchema : summarySchema,
+    schema = review ? reviewSchema : video ? videoSchema : summarySchema,
     format = z.toJSONSchema(schema);
-  const outputTokens = video ? cfg.videoOutputTokens : cfg.outputTokens;
+  const outputTokens = review
+    ? cfg.reviewOutputTokens
+    : video
+      ? cfg.videoOutputTokens
+      : cfg.outputTokens;
   const system =
-    instruction +
+    (review ? reviewInstruction : instruction) +
     (video
       ? ' 動画のproducts（商品名）,ingredients（成分名）,claims（claimとevidence、根拠が示されていない場合はそう記載）,timestamps（timeとdetail）も記録してください。各配列は重要なものだけ。'
       : '');
@@ -218,7 +243,13 @@ async function generate(env, provider, model, text, video) {
   const reservedInput =
     bytes(system + JSON.stringify(format) + text) +
     (video ? Math.ceil(video.seconds * 400) : 0);
-  const id = await reserve(env, model, provider, reservedInput, outputTokens);
+  const id = await reserve(
+    env,
+    model,
+    provider,
+    reservedInput,
+    outputTokens,
+  );
   let response;
   try {
     if (provider === 'gemini') {
@@ -238,7 +269,10 @@ async function generate(env, provider, model, text, video) {
                 parts: video
                   ? [
                       {
-                        fileData: { fileUri: video.url, mimeType: 'video/mp4' },
+                        fileData: {
+                          fileUri: video.url,
+                          mimeType: 'video/mp4',
+                        },
                       },
                       { text },
                     ]
@@ -277,7 +311,8 @@ async function generate(env, provider, model, text, video) {
     });
     await finish(env, id, response, 'received');
     return {
-      answer: response.response ?? response.choices?.[0]?.message?.content,
+      answer:
+        response.response ?? response.choices?.[0]?.message?.content,
       response,
     };
   } catch (error) {
@@ -309,7 +344,8 @@ export async function summarize(env, text, video = null) {
 }
 async function summarizeLocked(env, text, video = null) {
   const cfg = settings(env);
-  if (video && !env.GEMINI_API_KEY) throw new Deferred('gemini_key_missing');
+  if (video && !env.GEMINI_API_KEY)
+    throw new Deferred('gemini_key_missing');
   let provider = cfg.summaryProvider === 'workers' ? 'workers' : 'gemini';
   if (provider === 'gemini' && !env.GEMINI_API_KEY) {
     if (cfg.summaryProvider === 'auto' && !video) provider = 'workers';
@@ -368,7 +404,8 @@ async function summarizeLocked(env, text, video = null) {
       );
       const value = {
         ...parsed,
-        model: provider === 'gemini' ? cfg.summaryModel : cfg.fallbackModel,
+        model:
+          provider === 'gemini' ? cfg.summaryModel : cfg.fallbackModel,
         provider,
       };
       await saveCache(
@@ -471,20 +508,142 @@ export async function processEntity(env, job) {
   await env.DB.batch(statements);
   return { tags: labels, summary: summary.summary };
 }
-export async function runJobs(env) {
+
+async function processReview(env, job) {
+  const row = await env.DB.prepare('SELECT * FROM articles WHERE id=?')
+    .bind(job.entity_id)
+    .first();
+  const check = await env.DB.prepare(
+    'SELECT * FROM article_checks WHERE article_id=? AND content_hash=?',
+  )
+    .bind(job.entity_id, job.content_hash)
+    .first();
+  if (!row || !check || row.status !== 'pending_review')
+    return { obsolete: true };
+  const sources = (
+    await env.DB.prepare(
+      'SELECT s.* FROM sources s JOIN article_sources r ON r.source_id=s.id WHERE r.article_id=? ORDER BY s.id',
+    )
+      .bind(row.id)
+      .all()
+  ).results;
+  if (
+    (await reviewInput(env, row, sources)).content_hash !==
+    check.content_hash
+  )
+    return { obsolete: true };
+  if (check.result) return { cached: true };
+  const cfg = settings(env);
+  const lock = await hash('review-lock:' + check.content_hash);
+  return withLocks(env, [lock], async () => {
+    const keyFor = (p) =>
+      hash(
+        JSON.stringify([
+          'review-v1',
+          p,
+          p === 'gemini' ? cfg.summaryModel : cfg.fallbackModel,
+          check.content_hash,
+        ]),
+      );
+    let value = null;
+    for (const p of cfg.summaryProvider === 'auto'
+      ? ['gemini', 'workers']
+      : [cfg.summaryProvider]) {
+      value = await cached(env.DB, await keyFor(p));
+      if (value) break;
+    }
+    if (!value) {
+      let provider =
+        cfg.summaryProvider === 'workers' ? 'workers' : 'gemini';
+      if (!env.GEMINI_API_KEY && provider === 'gemini') {
+        if (cfg.summaryProvider === 'auto') provider = 'workers';
+        else throw new Deferred('gemini_key_missing');
+      }
+      for (let attempt = 0; attempt < 2; attempt++) {
+        let response;
+        try {
+          response = await generate(
+            env,
+            provider,
+            provider === 'gemini' ? cfg.summaryModel : cfg.fallbackModel,
+            check.input_text,
+            null,
+            true,
+          );
+        } catch (error) {
+          if (
+            error instanceof Deferred &&
+            error.code === 'gemini_quota' &&
+            cfg.summaryProvider === 'auto'
+          ) {
+            provider = 'workers';
+            response = await generate(
+              env,
+              provider,
+              cfg.fallbackModel,
+              check.input_text,
+              null,
+              true,
+            );
+          } else throw error;
+        }
+        try {
+          value = {
+            ...reviewSchema.parse(JSON.parse(response.answer)),
+            model:
+              provider === 'gemini'
+                ? cfg.summaryModel
+                : cfg.fallbackModel,
+            provider,
+          };
+        } catch {
+          if (attempt === 1) throw new Error('invalid_review_json');
+          continue;
+        }
+        await saveCache(
+          env.DB,
+          await keyFor(provider),
+          'review',
+          value.model,
+          value,
+        );
+        break;
+      }
+    }
+    await env.DB.prepare(
+      'UPDATE article_checks SET result=?,model=?,completed_at=? WHERE id=?',
+    )
+      .bind(JSON.stringify(value), value.model, now(), check.id)
+      .run();
+    return { review: true };
+  });
+}
+
+/** @param {any} env @param {{id:string,kind:'enrich'|'review'}|null} target */
+export async function runJobs(env, target = null) {
   const cfg = settings(env),
     out = [];
   for (let count = 0; count < cfg.jobLimit; count++) {
     const time = now(),
       lease = new Date(Date.now() + 600000).toISOString();
     const job = await env.DB.prepare(
-      "UPDATE ai_jobs SET state='processing',lease_until=?,attempts=attempts+1 WHERE id=(SELECT id FROM ai_jobs WHERE (state IN ('queued','deferred') AND next_attempt_at<=?) OR (state='processing' AND lease_until<?) ORDER BY created_at LIMIT 1) RETURNING *",
+      "UPDATE ai_jobs SET state='processing',lease_until=?,attempts=attempts+1 WHERE id=(SELECT id FROM ai_jobs WHERE ((state IN ('queued','deferred') AND next_attempt_at<=?) OR (state='processing' AND lease_until<?)) AND (? IS NULL OR (entity_type='article' AND entity_id=? AND job_type=?)) ORDER BY created_at LIMIT 1) RETURNING *",
     )
-      .bind(lease, time, time)
+      .bind(
+        lease,
+        time,
+        time,
+        target?.id ?? null,
+        target?.id ?? null,
+        target?.kind ?? null,
+      )
       .first();
     if (!job) break;
     try {
-      const result = await processEntity(env, job);
+      const result =
+        job.job_type === 'review'
+          ? await processReview(env, job)
+          : await processEntity(env, job);
       await env.DB.prepare(
         'UPDATE ai_jobs SET state=?,lease_until=NULL,error_code=NULL WHERE id=?',
       )
@@ -495,7 +654,9 @@ export async function runJobs(env) {
       const deferred = error instanceof Deferred;
       const code = deferred
         ? error.code
-        : /^(invalid_|gemini_http_|provider_|request_)/.test(error.message)
+        : /^(invalid_|gemini_http_|provider_|request_)/.test(
+              error.message,
+            )
           ? error.message
           : 'ai_processing_failed';
       const next = new Date(
@@ -517,14 +678,19 @@ export async function runJobs(env) {
           job.id,
         ),
         env.DB.prepare(
-          `UPDATE ${job.entity_type === 'article' ? 'articles' : 'sources'} SET ai_status=? WHERE id=? AND content_hash=? AND status NOT IN ('published','rejected')`,
+          `UPDATE ${job.entity_type === 'article' ? 'articles' : 'sources'} SET ai_status=? WHERE id=? AND content_hash=? AND status NOT IN ('published','rejected') AND ?='enrich'`,
         ).bind(
           deferred ? 'waiting' : 'failed',
           job.entity_id,
           job.content_hash,
+          job.job_type,
         ),
       ]);
-      out.push({ id: job.id, state: deferred ? 'deferred' : 'failed', code });
+      out.push({
+        id: job.id,
+        state: deferred ? 'deferred' : 'failed',
+        code,
+      });
       if (deferred && code === 'daily_budget') break;
     }
   }

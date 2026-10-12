@@ -1,4 +1,6 @@
 import { Hono } from 'hono';
+import { z } from 'zod';
+import { reviewInput } from './review.mjs';
 import { createRemoteJWKSet, jwtVerify } from 'jose';
 import type {
   D1Database,
@@ -27,8 +29,16 @@ import { runJobs } from './ai.mjs';
 import { discoverVideos } from './youtube.mjs';
 import { adminPage } from './admin.mjs';
 import { triggerBuild, monitorBuilds } from './publish.mjs';
-type Env = { DB: D1Database; AI: Ai; ASSETS: Fetcher; [key: string]: any };
-const app = new Hono<{ Bindings: Env; Variables: { admin: string } }>();
+type Env = {
+  DB: D1Database;
+  AI: Ai;
+  ASSETS: Fetcher;
+  [key: string]: any;
+};
+const app = new Hono<{
+  Bindings: Env;
+  Variables: { admin: string; role: string };
+}>();
 const jwks = new Map<string, ReturnType<typeof createRemoteJWKSet>>();
 async function json(c: any) {
   if (!c.req.header('Content-Type')?.startsWith('application/json'))
@@ -100,7 +110,12 @@ app.use('/api/ingest/*', async (c, next) => {
 const adminAuth = async (c: any, next: any) => {
   const env = c.env;
   const token = c.req.header('Cf-Access-Jwt-Assertion');
-  if (!token || !env.ACCESS_TEAM_DOMAIN || !env.ACCESS_AUD || !env.ADMIN_EMAILS)
+  if (
+    !token ||
+    !env.ACCESS_TEAM_DOMAIN ||
+    !env.ACCESS_AUD ||
+    !env.ADMIN_EMAILS
+  )
     throw new ApiError(403, 'admin_access_required');
   try {
     const domain = new URL(env.ACCESS_TEAM_DOMAIN);
@@ -120,15 +135,21 @@ const adminAuth = async (c: any, next: any) => {
       audience: env.ACCESS_AUD,
     });
     const email =
-      typeof payload.email === 'string' ? payload.email.toLowerCase() : '';
-    if (
-      !env.ADMIN_EMAILS.split(',')
-        .map((v: string) => v.trim().toLowerCase())
-        .includes(email) ||
-      !email
-    )
-      throw new Error();
+      typeof payload.email === 'string'
+        ? payload.email.toLowerCase()
+        : '';
+    if (!email) throw new Error();
+    const owner = env.ADMIN_EMAILS.split(',')
+      .map((v: string) => v.trim().toLowerCase())
+      .includes(email);
+    const editor: any = owner
+      ? null
+      : await env.DB.prepare('SELECT active FROM editors WHERE email=?')
+          .bind(email)
+          .first();
+    if (!owner && editor?.active !== 1) throw new Error();
     c.set('admin', email);
+    c.set('role', owner ? 'admin' : 'editor');
   } catch {
     throw new ApiError(403, 'admin_access_required');
   }
@@ -142,6 +163,81 @@ const adminAuth = async (c: any, next: any) => {
 app.use('/admin', adminAuth);
 app.use('/admin/*', adminAuth);
 app.use('/api/admin/*', adminAuth);
+
+const ownersOnly = async (c: any, next: any) => {
+  if (c.get('role') !== 'admin')
+    throw new ApiError(403, 'owner_required');
+  await next();
+};
+for (const path of [
+  '/api/admin/editors',
+  '/api/admin/editors/*',
+  '/api/admin/operations',
+  '/api/admin/jobs/*',
+  '/api/admin/youtube/*',
+  '/api/admin/channels',
+  '/api/admin/channels/*',
+  '/api/admin/articles/*/retry-build',
+])
+  app.use(path, ownersOnly);
+app.get('/api/admin/me', (c) =>
+  c.json({ email: c.get('admin'), role: c.get('role') }),
+);
+app.get('/api/admin/editors', async (c) => {
+  const editors = (
+    await c.env.DB.prepare(
+      'SELECT email,active,added_by,updated_at FROM editors ORDER BY email',
+    ).all()
+  ).results;
+  const events = (
+    await c.env.DB.prepare(
+      'SELECT email,actor,action,created_at FROM editor_events ORDER BY id DESC LIMIT 30',
+    ).all()
+  ).results;
+  return c.json({
+    editors,
+    events,
+    admins: c.env.ADMIN_EMAILS.split(',')
+      .map((s: string) => s.trim())
+      .filter(Boolean),
+  });
+});
+app.post('/api/admin/editors', async (c) => {
+  const data = parse(
+    z.object({ email: z.email().max(254), active: z.boolean() }).strict(),
+    await json(c),
+  );
+  const email = data.email.trim().toLowerCase();
+  if (
+    c.env.ADMIN_EMAILS.split(',')
+      .map((s: string) => s.trim().toLowerCase())
+      .includes(email)
+  )
+    throw new ApiError(400, 'bootstrap_admin_immutable');
+  const time = now();
+  await c.env.DB.batch([
+    c.env.DB.prepare(
+      'INSERT INTO editors(email,active,added_by,updated_at) VALUES(?,?,?,?) ON CONFLICT(email) DO UPDATE SET active=excluded.active,updated_at=excluded.updated_at',
+    ).bind(email, data.active ? 1 : 0, c.get('admin'), time),
+    c.env.DB.prepare(
+      'INSERT INTO editor_events(email,actor,action,created_at) VALUES(?,?,?,?)',
+    ).bind(
+      email,
+      c.get('admin'),
+      data.active ? 'enabled' : 'disabled',
+      time,
+    ),
+  ]);
+  return c.json({ email, active: data.active });
+});
+app.post('/api/admin/preview', async (c) => {
+  const data = parse(
+    z.object({ body_markdown: z.string().max(50000) }).strict(),
+    await json(c),
+  );
+  return c.json({ preview_html: renderMarkdown(data.body_markdown) });
+});
+
 app.get('/admin', (c) => {
   c.header('Cache-Control', 'no-store');
   c.header(
@@ -299,7 +395,10 @@ app.post('/api/ingest/articles', async (c) => {
       throw new ApiError(409, 'duplicate_slug');
     throw error;
   }
-  return c.json({ id, status: 'pending_review', ai_status: 'queued' }, 201);
+  return c.json(
+    { id, status: 'pending_review', ai_status: 'queued' },
+    201,
+  );
 });
 app.get('/api/admin/articles', async (c) => {
   await monitorBuilds(c.env);
@@ -311,7 +410,7 @@ app.get('/api/admin/articles', async (c) => {
     throw new ApiError(400, 'invalid_offset');
   const rows = (
     await c.env.DB.prepare(
-      'SELECT id,slug,title,status,ai_status,updated_at,revision FROM articles WHERE status=? ORDER BY created_at DESC,id LIMIT 51 OFFSET ?',
+      'SELECT id,slug,title,status,ai_status,updated_at,revision,category FROM articles WHERE status=? ORDER BY created_at DESC,id LIMIT 51 OFFSET ?',
     )
       .bind(status, offset)
       .all()
@@ -323,13 +422,15 @@ app.get('/api/admin/articles', async (c) => {
 });
 app.get('/api/admin/articles/:id', async (c) => {
   await monitorBuilds(c.env);
-  const row: any = await c.env.DB.prepare('SELECT * FROM articles WHERE id=?')
+  const row: any = await c.env.DB.prepare(
+    'SELECT * FROM articles WHERE id=?',
+  )
     .bind(c.req.param('id'))
     .first();
   if (!row) throw new ApiError(404, 'article_not_found');
   const sources = (
     await c.env.DB.prepare(
-      'SELECT s.* FROM sources s JOIN article_sources r ON r.source_id=s.id WHERE r.article_id=?',
+      'SELECT s.* FROM sources s JOIN article_sources r ON r.source_id=s.id WHERE r.article_id=? ORDER BY s.id',
     )
       .bind(row.id)
       .all()
@@ -346,7 +447,38 @@ app.get('/api/admin/articles/:id', async (c) => {
   )
     .bind(row.id)
     .first();
+  const checkInput = await reviewInput(c.env, row, sources);
+  const check: any = await c.env.DB.prepare(
+    "SELECT c.*,j.state,j.error_code,j.next_attempt_at FROM article_checks c LEFT JOIN ai_jobs j ON j.entity_type='article' AND j.entity_id=c.article_id AND j.content_hash=c.content_hash AND j.job_type='review' WHERE c.article_id=? ORDER BY (c.content_hash=?) DESC,c.created_at DESC,c.id DESC LIMIT 1",
+  )
+    .bind(row.id, checkInput.content_hash)
+    .first();
+  const versions = (
+    await c.env.DB.prepare(
+      'SELECT revision,title,created_at FROM article_versions WHERE article_id=? ORDER BY revision DESC LIMIT 30',
+    )
+      .bind(row.id)
+      .all()
+  ).results;
   return c.json({
+    check: check
+      ? {
+          id: check.id,
+          revision: check.revision,
+          state: check.state,
+          error_code: check.error_code,
+          next_attempt_at: check.next_attempt_at,
+          requested_by: check.requested_by,
+          created_at: check.created_at,
+          completed_at: check.completed_at,
+          model: check.model,
+          result: check.result ? JSON.parse(check.result) : null,
+          body_chars: check.body_chars,
+          reviewed_chars: check.reviewed_chars,
+          stale: check.content_hash !== checkInput.content_hash,
+        }
+      : null,
+    versions,
     article: decode(row),
     sources,
     events,
@@ -355,6 +487,122 @@ app.get('/api/admin/articles/:id', async (c) => {
     review_flags: reviewFlags(row),
   });
 });
+
+app.get('/api/admin/articles/:id/versions/:revision', async (c) => {
+  const revision = Number(c.req.param('revision'));
+  if (!Number.isSafeInteger(revision) || revision < 1)
+    throw new ApiError(400, 'invalid_input');
+  const version: any = await c.env.DB.prepare(
+    'SELECT * FROM article_versions WHERE article_id=? AND revision=?',
+  )
+    .bind(c.req.param('id'), revision)
+    .first();
+  if (!version) throw new ApiError(404, 'version_not_found');
+  return c.json({
+    version: decode(version),
+    preview_html: renderMarkdown(version.body_markdown),
+  });
+});
+app.post('/api/admin/articles/:id/ai-check', async (c) => {
+  const data = parse(
+    z.object({ revision: z.number().int().positive() }).strict(),
+    await json(c),
+  );
+  const id = c.req.param('id');
+  const row: any = await c.env.DB.prepare(
+    "SELECT * FROM articles WHERE id=? AND revision=? AND status='pending_review'",
+  )
+    .bind(id, data.revision)
+    .first();
+  if (!row) throw new ApiError(409, 'revision_conflict');
+  const sources = (
+    await c.env.DB.prepare(
+      'SELECT s.* FROM sources s JOIN article_sources r ON r.source_id=s.id WHERE r.article_id=? ORDER BY s.id',
+    )
+      .bind(id)
+      .all()
+  ).results;
+  const input = await reviewInput(c.env, row, sources);
+  const time = now();
+  const existing: any = await c.env.DB.prepare(
+    'SELECT * FROM article_checks WHERE article_id=? AND content_hash=?',
+  )
+    .bind(id, input.content_hash)
+    .first();
+  if (existing?.result)
+    return c.json({ state: 'complete', cached: true });
+  const mutation = crypto.randomUUID();
+  // Conditional insert + audit in one transaction: stale editors cannot enqueue a check of an older revision.
+  const results = await c.env.DB.batch([
+    c.env.DB.prepare(
+      "INSERT OR IGNORE INTO article_checks(id,article_id,content_hash,revision,input_text,body_chars,reviewed_chars,requested_by,created_at) SELECT ?,id,?,revision,?,?,?,?,? FROM articles WHERE id=? AND revision=? AND status='pending_review'",
+    ).bind(
+      mutation,
+      input.content_hash,
+      input.input_text,
+      input.body_chars,
+      input.reviewed_chars,
+      c.get('admin'),
+      time,
+      id,
+      data.revision,
+    ),
+    c.env.DB.prepare(
+      "INSERT OR IGNORE INTO ai_jobs(id,entity_type,entity_id,content_hash,next_attempt_at,created_at,job_type) SELECT ?,'article',article_id,content_hash,?,?,'review' FROM article_checks WHERE id=?",
+    ).bind(crypto.randomUUID(), time, time, mutation),
+    c.env.DB.prepare(
+      "INSERT INTO review_events(article_id,actor,action,revision,created_at) SELECT article_id,?,'ai_check_requested',revision,? FROM article_checks WHERE id=?",
+    ).bind(c.get('admin'), time, mutation),
+  ]);
+  if (!results[0].meta.changes && !existing)
+    throw new ApiError(409, 'revision_conflict');
+  // Explicit retry only for failed jobs. Deferred quota jobs keep their next retry date.
+  await c.env.DB.prepare(
+    "UPDATE ai_jobs SET state='queued',next_attempt_at=?,error_code=NULL WHERE entity_type='article' AND entity_id=? AND job_type='review' AND content_hash=? AND state IN ('failed','obsolete')",
+  )
+    .bind(time, id, input.content_hash)
+    .run();
+  return c.json({ state: 'queued' });
+});
+app.post('/api/admin/articles/:id/ai-run', async (c) => {
+  const data = parse(
+    z
+      .object({
+        revision: z.number().int().positive(),
+        kind: z.enum(['enrich', 'review']),
+      })
+      .strict(),
+    await json(c),
+  );
+  const row: any = await c.env.DB.prepare(
+    "SELECT revision FROM articles WHERE id=? AND status='pending_review'",
+  )
+    .bind(c.req.param('id'))
+    .first();
+  if (!row || row.revision !== data.revision)
+    throw new ApiError(409, 'revision_conflict');
+  // Limit a single editor to 10 runs per minute, in addition to shared AI daily limits.
+  const bucket = 'editor:' + c.get('admin') + ':' + now().slice(0, 16);
+  const hits: any = await c.env.DB.prepare(
+    'INSERT INTO rate_limits(bucket,hits,expires_at) VALUES(?,1,?) ON CONFLICT(bucket) DO UPDATE SET hits=hits+1 RETURNING hits',
+  )
+    .bind(bucket, new Date(Date.now() + 120000).toISOString())
+    .first();
+  if (hits.hits > 10) throw new ApiError(429, 'rate_limited');
+  if (data.kind === 'enrich')
+    await c.env.DB.prepare(
+      "UPDATE ai_jobs SET state='queued',next_attempt_at=?,error_code=NULL WHERE entity_type='article' AND entity_id=? AND job_type='enrich' AND state='failed'",
+    )
+      .bind(now(), c.req.param('id'))
+      .run();
+  return c.json({
+    jobs: await runJobs(c.env, {
+      id: c.req.param('id'),
+      kind: data.kind,
+    }),
+  });
+});
+
 app.patch('/api/admin/articles/:id', async (c) => {
   const input = await json(c);
   if (typeof input.ai_check_notes === 'string')
@@ -398,9 +646,19 @@ app.patch('/api/admin/articles/:id', async (c) => {
     ).bind(c.get('admin'), 'edited', time, id, mutation),
     c.env.DB.prepare(
       'INSERT OR IGNORE INTO ai_jobs(id,entity_type,entity_id,content_hash,next_attempt_at,created_at) SELECT ?,?,?,?,?,? FROM articles WHERE id=? AND mutation_token=?',
-    ).bind(crypto.randomUUID(), 'article', id, hash, time, time, id, mutation),
+    ).bind(
+      crypto.randomUUID(),
+      'article',
+      id,
+      hash,
+      time,
+      time,
+      id,
+      mutation,
+    ),
   ]);
-  if (!results[0].meta.changes) throw new ApiError(409, 'revision_conflict');
+  if (!results[0].meta.changes)
+    throw new ApiError(409, 'revision_conflict');
   return c.json({ id, revision: data.revision + 1 });
 });
 app.post('/api/admin/articles/:id/review', async (c) => {
@@ -473,7 +731,8 @@ app.post('/api/admin/articles/:id/review', async (c) => {
       ).bind(publicationId, time, time, id, publicationId),
     );
   const results = await c.env.DB.batch(statements);
-  if (!results[0].meta.changes) throw new ApiError(409, 'revision_conflict');
+  if (!results[0].meta.changes)
+    throw new ApiError(409, 'revision_conflict');
   const publication =
     body.status === 'published'
       ? await triggerBuild(c.env, { id: publicationId })
@@ -520,7 +779,9 @@ app.get('/api/admin/operations', async (c) => {
       'SELECT id,title,type,ai_status,status,video_seconds FROM sources ORDER BY fetched_at DESC LIMIT 20',
     ).all()
   ).results;
-  const usage = await c.env.DB.prepare('SELECT * FROM daily_budget WHERE day=?')
+  const usage = await c.env.DB.prepare(
+    'SELECT * FROM daily_budget WHERE day=?',
+  )
     .bind(now().slice(0, 10))
     .first();
   const calls = (
@@ -577,7 +838,9 @@ app.get('/api/published/export', async (c) => {
   if (
     !(await secureEqual(
       c.req.header('Authorization'),
-      c.env.CONTENT_EXPORT_KEY ? `Bearer ${c.env.CONTENT_EXPORT_KEY}` : null,
+      c.env.CONTENT_EXPORT_KEY
+        ? `Bearer ${c.env.CONTENT_EXPORT_KEY}`
+        : null,
     ))
   )
     throw new ApiError(401, 'unauthorized');
@@ -602,7 +865,10 @@ export default {
     env: Env,
     ctx: ExecutionContext,
   ) {
-    if (env.PIPELINE_ENV !== 'production' || env.ENABLE_SCHEDULED !== 'true')
+    if (
+      env.PIPELINE_ENV !== 'production' ||
+      env.ENABLE_SCHEDULED !== 'true'
+    )
       return;
     ctx.waitUntil(
       (async () => {
@@ -612,7 +878,9 @@ export default {
             return;
           }
         } catch {
-          console.error(JSON.stringify({ event: 'youtube_discovery_failed' }));
+          console.error(
+            JSON.stringify({ event: 'youtube_discovery_failed' }),
+          );
         }
         if (_controller.cron === '0 0 * * *') return;
         await runJobs(env);

@@ -34,11 +34,19 @@ export function settings(env) {
     embeddingChars: number(env, 'EMBEDDING_INPUT_CHARS', 1200, 100, 3000),
     outputTokens: number(env, 'SUMMARY_MAX_TOKENS', 512, 128, 1024),
     videoOutputTokens: number(env, 'VIDEO_MAX_TOKENS', 1536, 512, 2048),
+    reviewInputChars: number(env, 'REVIEW_INPUT_CHARS', 4000, 500, 6000),
+    reviewOutputTokens: number(env, 'REVIEW_MAX_TOKENS', 1400, 512, 2048),
     dailyCalls: number(env, 'AI_DAILY_CALL_LIMIT', 30, 0, 1000),
     dailyTokens: number(env, 'AI_DAILY_TOKEN_LIMIT', 600000, 0, 1000000),
     maxVideos: number(env, 'YOUTUBE_VIDEOS_PER_RUN', 3, 0, 20),
     maxVideoSeconds: number(env, 'YOUTUBE_MAX_SECONDS', 1800, 60, 7200),
     jobLimit: number(env, 'JOBS_PER_RUN', 1, 1, 1),
-    ingestPerMinute: number(env, 'INGEST_REQUESTS_PER_MINUTE', 60, 1, 600),
+    ingestPerMinute: number(
+      env,
+      'INGEST_REQUESTS_PER_MINUTE',
+      60,
+      1,
+      600,
+    ),
   };
 }
