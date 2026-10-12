@@ -336,3 +336,18 @@ AIチェックで利用制限に当たった場合は待機状態にし、AIチ�
 Accessのホスト名と、実際に開くPreviewのホスト名を一致させ、admin、admin/_、api/admin/_ のパスを保護してください。
 ブランチを変更した場合に、前のPreviewのシークレットやAccess設定が自動的に引き継がれるとは限りません。
 Cloudflare Previewでのログインと実AI呼び出しは、これらの設定が揃ってから確認します。
+
+## Previewのシークレットを保った更新（2026-10-12）
+
+Wrangler 4.148.0の通常の preview コマンドで環境設定を置き換えると、個別に登録したシークレットが失われる場合があります。
+更新には npm run deploy:preview を使用してください。Cloudflare BuildsのPreview commandもこのコマンドに変更します。
+既存Previewのシークレットの名前だけを一覧から取得し、type:inheritで全件を引き継ぎます。キーの値を読み出したりGitに保存したりしません。
+一覧の読み取り失敗、形式変更、必要な7件の不足ではデプロイを停止します。mainを指定した実行も拒否します。
+この挙動は一時Previewで実際にキーを登録・更新し、値が保持されることを確認しています。
+
+初回の新しいPreviewは通常の npx wrangler preview で作成した後、必要な7件を preview secret put --name <preview> で登録します。
+登録が済んだPreviewの以後の更新には deploy:preview を使用してください。GoogleのキーやAccessの設定はPreviewごとに必要です。
+現在の確認用URLは codex/content-review-pipeline のPreviewです。ここには codex/editor-dashboard の最新版も反映しています。
+ADMIN_EMAILS、ACCESS_TEAM_DOMAIN、ACCESS_AUDをこのPreviewに登録済みです。
+テスト用に肌・髪・爪の記事を3件 pending_review で登録しました。まだAI処理・公開はしていません。
+Accessのパス設定が反映され、メールログインができた後に、記事の「要約・タグを処理する」と「この記事をAIにチェックさせる」で検証します。

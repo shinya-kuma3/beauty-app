@@ -20,7 +20,8 @@
     "dev:worker": "wrangler dev --local --port 8787",
     "test:pipeline": "node --test tests/pipeline.test.mjs",
     "setup:cloudflare": "node scripts/setup-cloudflare.mjs",
-    "sample:ai": "node scripts/sample-ai.mjs"
+    "sample:ai": "node scripts/sample-ai.mjs",
+    "deploy:preview": "node scripts/deploy-preview.mjs"
   },
   "dependencies": {
     "astro": "7.3.6",
