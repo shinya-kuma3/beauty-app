@@ -5,7 +5,7 @@ const api='https://codex-content-review-pipeline-beauty-app.sinyak4649.workers.d
 ---
 <Layout title="意見箱" description="my beauty paletteへのご意見や改善案をお寄せください。">
  <section class="shell section feedback-page"><p class="eyebrow">YOUR VOICE, OUR NEXT PALETTE.</p><h1>あなたの声を、これからの彩りに。</h1><p class="feedback-lead">気になったこと、こんな情報がほしいというアイデア。<br />サイトへのご意見を、お聞かせください。</p>
- <form id="feedback-form" data-api={api} class="feedback-form">
+ <form id="feedback-form" data-api={api} data-home={pathTo()} class="feedback-form">
  <div class="feedback-fields"><label for="feedback-name">お名前 <span>任意</span><input id="feedback-name" name="name" autocomplete="name" maxlength="80" /></label><label for="feedback-email">メールアドレス <span>任意</span><input id="feedback-email" name="email" type="email" autocomplete="email" maxlength="254" /></label></div>
  <label for="feedback-content">投稿内容 <span class="required-note">必須</span><textarea id="feedback-content" name="message" required maxlength="5000" rows="8" placeholder="ご意見・改善案などをご記入ください。" aria-describedby="feedback-count feedback-privacy"></textarea></label><p id="feedback-count" class="feedback-count">0 / 5,000文字</p>
  <div class="feedback-honeypot" aria-hidden="true"><label>この欄は入力しないでください<input name="company_website" tabindex="-1" autocomplete="off" /></label></div>
@@ -14,5 +14,6 @@ const api='https://codex-content-review-pipeline-beauty-app.sinyak4649.workers.d
  </form>
  <aside id="feedback-privacy" class="feedback-privacy"><h2>投稿前にご確認ください</h2><p>名前・メールは任意です。投稿内容と記入された情報は、ご意見の確認と必要な場合の返信のために管理者が利用し、サイトには公開しません。返信を保証するものではありません。医療相談や個人の症状への診断は受け付けていません。</p><p>住所やパスワードなど、不要な個人情報は書かないでください。ボット対策にCloudflare Turnstileを使用します。<a href="https://www.cloudflare.com/privacypolicy/" target="_blank" rel="noopener noreferrer">Cloudflareのプライバシーポリシー</a>もご確認ください。</p><p>転載・再配布のご相談も、こちらで受け付けます。<a href={pathTo('license/')}>サイトの利用・転載ルール</a></p></aside>
  </section>
+ <dialog id="feedback-thanks" class="feedback-thanks" aria-labelledby="feedback-thanks-title" aria-describedby="feedback-thanks-description"><span class="feedback-thanks-mark" aria-hidden="true">✓</span><h2 id="feedback-thanks-title">ご意見、ありがとうございます。</h2><p id="feedback-thanks-description">あなたの声を、これからのサイトづくりに役立てます。</p><p class="feedback-thanks-count"><span id="feedback-redirect-count">3</span>秒後にTOPへ移動します。</p><a id="feedback-home" class="button primary" href={pathTo()}>TOPへ戻る <span aria-hidden="true">→</span></a></dialog>
  <script is:inline src={pathTo('feedback.js')} defer></script>
 </Layout>

@@ -45,7 +45,13 @@
     const result = await api(
       "?status=" + $("feedback-status").value + "&offset=" + offset,
     );
-    $("feedback-unread").textContent = "未確認 " + (result.unread || 0) + "件";
+    const unread = Number(result.unread) || 0;
+    $("feedback-unread").textContent = String(unread);
+    $("feedback-unread").hidden = unread === 0;
+    $("feedback-unread").setAttribute(
+      "aria-label",
+      "未確認の投稿 " + unread + "件",
+    );
     for (const item of result.items || []) {
       const card = el("article", "");
       card.className = "feedback-card";

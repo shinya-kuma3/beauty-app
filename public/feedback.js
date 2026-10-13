@@ -8,15 +8,42 @@
     widget = null,
     busy = false,
     previous = "",
-    id = "";
+    id = "",
+    completed = false;
   const ready = () => {
-    submit.disabled = busy || !token;
+    submit.disabled = busy || completed || !token;
   };
   const reset = () => {
     token = "";
     ready();
-    if (widget !== null) window.turnstile.reset(widget);
+    if (widget !== null && !completed) window.turnstile.reset(widget);
   };
+  function thankYou() {
+    const dialog = document.getElementById("feedback-thanks");
+    const home = document.getElementById("feedback-home");
+    if (!dialog || !home) return;
+    const target = new URL(form.dataset.home || "/", window.location.href);
+    if (target.origin !== window.location.origin) return;
+    let remaining = 3;
+    dialog.showModal();
+    home.focus();
+    const countdown = setInterval(() => {
+      remaining--;
+      document.getElementById("feedback-redirect-count").textContent =
+        String(remaining);
+      if (remaining === 0) {
+        clearInterval(countdown);
+        window.location.assign(target.href);
+      }
+    }, 1000);
+    home.addEventListener("click", () => clearInterval(countdown), {
+      once: true,
+    });
+    dialog.addEventListener("cancel", (event) => event.preventDefault());
+    window.addEventListener("pagehide", () => clearInterval(countdown), {
+      once: true,
+    });
+  }
   text.addEventListener(
     "input",
     () =>
@@ -33,7 +60,7 @@
   };
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
-    if (busy || !token || !form.reportValidity()) return;
+    if (busy || completed || !token || !form.reportValidity()) return;
     busy = true;
     ready();
     status.textContent = "送信しています。";
@@ -64,11 +91,13 @@
           errors[result?.error?.code] ||
             "送信できませんでした。入力は残しています。時間をおいて再度お試しください。",
         );
+      completed = true;
       form.reset();
       id = "";
       previous = "";
       document.getElementById("feedback-count").textContent = "0 / 5,000文字";
       status.textContent = "ご意見を受け付けました。ありがとうございます。";
+      thankYou();
     } catch (error) {
       status.textContent = error.message;
     } finally {
@@ -98,7 +127,8 @@
           callback: (value) => {
             token = value;
             ready();
-            status.textContent = "内容を確認してお送りください。";
+            if (!completed)
+              status.textContent = "内容を確認してお送りください。";
           },
           "expired-callback": () => {
             token = "";

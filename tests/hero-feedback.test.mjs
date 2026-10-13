@@ -23,7 +23,7 @@ function win() {
     },
   });
 }
-test("ヒーローは5場面を手動選択でき、キーボードと動きを減らす設定に対応", async () => {
+test("ヒーローは6秒で自動切り替えし、非表示タブと動きを減らす設定では停止する", async () => {
   const w = win();
   try {
     w.document.write(
@@ -33,37 +33,93 @@ test("ヒーローは5場面を手動選択でき、キーボードと動きを�
           (_, i) =>
             '<div data-scene class="' +
             (i === 0 ? "is-active" : "") +
-            '"></div><button data-hero-dot></button>',
+            '"></div><span data-hero-progress class="' +
+            (i === 0 ? "is-active" : "") +
+            '"><i></i></span>',
         ).join("") +
-        "<button data-hero-pause></button></div>",
+        "</div>",
     );
-    w.matchMedia = () => ({ matches: true, addEventListener() {} });
+    let callback,
+      delay,
+      cleared = 0;
+    w.setTimeout = (fn, ms) => {
+      callback = fn;
+      delay = ms;
+      return 1;
+    };
+    w.clearTimeout = () => cleared++;
+    const motion = {
+      matches: false,
+      addEventListener(_event, fn) {
+        this.changed = fn;
+      },
+    };
+    w.matchMedia = () => motion;
+    Object.defineProperty(w.document, "hidden", {
+      value: false,
+      configurable: true,
+    });
     w.eval(hero);
-    const dots = w.document.querySelectorAll("[data-hero-dot]");
-    dots[3].click();
-    assert.equal(dots[3].getAttribute("aria-pressed"), "true");
+    assert.equal(delay, 6000);
+    callback();
     assert.equal(
       w.document
-        .querySelectorAll("[data-scene]")[0]
+        .querySelectorAll("[data-scene]")[1]
         .getAttribute("aria-hidden"),
+      "false",
+    );
+    assert.equal(
+      w.document
+        .querySelectorAll("[data-hero-progress]")[1]
+        .classList.contains("is-active"),
+      true,
+    );
+    assert.equal(w.document.querySelector("button"), null);
+    motion.matches = true;
+    motion.changed();
+    assert.equal(
+      w.document.querySelector("[data-hero-carousel]").dataset.running,
+      "false",
+    );
+    assert.ok(cleared > 0);
+    motion.matches = false;
+    motion.changed();
+    assert.equal(
+      w.document.querySelector("[data-hero-carousel]").dataset.running,
       "true",
     );
-    assert.equal(w.document.querySelector("[data-hero-pause]").disabled, true);
-    dots[3].dispatchEvent(new w.KeyboardEvent("keydown", { key: "End" }));
-    assert.equal(dots[4].getAttribute("aria-pressed"), "true");
+    Object.defineProperty(w.document, "hidden", {
+      value: true,
+      configurable: true,
+    });
+    w.document.dispatchEvent(new w.Event("visibilitychange"));
+    assert.equal(
+      w.document.querySelector("[data-hero-carousel]").dataset.running,
+      "false",
+    );
   } finally {
     await w.happyDOM.close();
   }
 });
+
 test("意見箱は検証前に送信できず、失敗時も入力を残して再送のUUIDを保つ", async () => {
   const w = win();
   try {
     w.document.write(
-      '<form id="feedback-form" data-api="https://api.example/api/feedback"><input name="name"><input name="email"><textarea name="message"></textarea><input name="company_website"><button id="feedback-submit" disabled></button></form><div id="feedback-challenge"></div><p id="feedback-status"></p><p id="feedback-count"></p>',
+      '<form id="feedback-form" data-api="https://api.example/api/feedback"><input name="name"><input name="email"><textarea name="message"></textarea><input name="company_website"><button id="feedback-submit" disabled></button></form><div id="feedback-challenge"></div><p id="feedback-status"></p><p id="feedback-count"></p><dialog id="feedback-thanks"><h2>ご意見、ありがとうございます。</h2><span id="feedback-redirect-count">3</span><a id="feedback-home" href="/">TOPへ戻る</a></dialog>',
     );
     let callbacks,
       calls = [],
       resets = 0;
+    let tick, redirect;
+    w.setInterval = (fn) => {
+      tick = fn;
+      return 1;
+    };
+    w.clearInterval = () => {};
+    w.location.assign = (url) => {
+      redirect = url;
+    };
     w.turnstile = {
       render(_target, options) {
         callbacks = options;
@@ -94,12 +150,28 @@ test("意見箱は検証前に送信できず、失敗時も入力を残して�
     form.dispatchEvent(new w.Event("submit", { cancelable: true }));
     await settle();
     assert.equal(form.elements.message.value, "改善案");
+    assert.equal(w.document.getElementById("feedback-thanks").open, false);
     assert.equal(resets, 1);
     callbacks.callback("new-token");
     form.dispatchEvent(new w.Event("submit", { cancelable: true }));
     await settle();
     assert.equal(calls[0].id, calls[1].id);
     assert.equal(form.elements.message.value, "");
+    assert.equal(w.document.getElementById("feedback-thanks").open, true);
+    assert.equal(w.document.activeElement.id, "feedback-home");
+    tick();
+    assert.equal(
+      w.document.getElementById("feedback-redirect-count").textContent,
+      "2",
+    );
+    tick();
+    assert.equal(redirect, undefined);
+    tick();
+    assert.equal(
+      redirect,
+      "https://develop-beauty-app.sinyak4649.workers.dev/",
+    );
+    assert.equal(w.document.getElementById("feedback-submit").disabled, true);
     assert.match(
       w.document.getElementById("feedback-status").textContent,
       /受け付け/,
@@ -142,6 +214,14 @@ test("管理意見箱は編集者に表示せず、投稿本文をHTMLとして�
       );
       if (role === "editor") assert.equal(calls.length, 1);
       else {
+        assert.equal(
+          w.document.getElementById("feedback-unread").textContent,
+          "1",
+        );
+        assert.equal(
+          w.document.getElementById("feedback-unread").hidden,
+          false,
+        );
         assert.equal(w.document.querySelector("#feedback-list img"), null);
         assert.match(
           w.document.querySelector(".feedback-body").textContent,
@@ -151,5 +231,23 @@ test("管理意見箱は編集者に表示せず、投稿本文をHTMLとして�
     } finally {
       await w.happyDOM.close();
     }
+  }
+});
+
+test("未確認の投稿が0件なら通知の数字を非表示にする", async () => {
+  const w = win();
+  try {
+    w.document.write(adminPage());
+    w.fetch = async (url) =>
+      Response.json(
+        String(url).endsWith("/me")
+          ? { role: "admin" }
+          : { items: [], unread: 0, total: 0 },
+      );
+    w.eval(admin);
+    await settle();
+    assert.equal(w.document.getElementById("feedback-unread").hidden, true);
+  } finally {
+    await w.happyDOM.close();
   }
 });
