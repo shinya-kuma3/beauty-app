@@ -1923,3 +1923,12 @@ test("Turnstile停止時と大きすぎるリクエストを保存せず拒否�
   assert.equal(huge.status, 413);
   assert.equal(e.DB.sql.prepare("SELECT count(*) n FROM feedback").get().n, 0);
 });
+
+test('意見箱APIは状態ごとの全件数と指定表示数・ページを返す',async()=>{
+ const e=feedbackEnv();for(let i=0;i<59;i++)e.DB.sql.prepare('INSERT INTO feedback(id,message,payload_hash,status,created_at) VALUES(?,?,?,?,?)').run(String(i).padStart(3,'0'),'本文'+i,'hash-'+i,i%2?'read':'new','2026-10-13T00:00:00Z');
+ const first=await request(e,'/api/admin/feedback?status=all&limit=20&offset=0','GET',undefined,true);
+ const last=await request(e,'/api/admin/feedback?status=all&limit=20&offset=40','GET',undefined,true);
+ assert.equal(first.data.total,59);assert.equal(first.data.items.length,20);assert.equal(last.data.items.length,19);assert.ok(last.data.items.every(row=>!first.data.items.some(item=>item.id===row.id)));
+ const filtered=await request(e,'/api/admin/feedback?status=new&limit=10&offset=10','GET',undefined,true);assert.equal(filtered.data.total,30);assert.equal(filtered.data.unread,30);assert.equal(filtered.data.items.length,10);assert.ok(filtered.data.items.every(row=>row.status==='new'));
+ assert.equal((await request(e,'/api/admin/feedback?limit=51','GET',undefined,true)).response.status,400);
+});

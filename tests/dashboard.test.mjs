@@ -403,3 +403,7 @@ test('続きを表示するとき未適用のフォーム変更を混ぜず、AP
     await s.window.happyDOM.close();
   }
 });
+
+test('記事一覧を更新しても意見箱の前へ・次への無効状態を解除しない',async()=>{
+ const s=await setup('admin');try{s.window.eval(await readFile(new URL('../public/admin-feedback.js',import.meta.url),'utf8'));await settle();assert.equal(s.$('feedback-prev').disabled,true);assert.equal(s.$('feedback-next').disabled,true);s.$('refresh').click();await settle();assert.equal(s.$('feedback-prev').disabled,true);assert.equal(s.$('feedback-next').disabled,true);}finally{await s.window.happyDOM.close();}
+});

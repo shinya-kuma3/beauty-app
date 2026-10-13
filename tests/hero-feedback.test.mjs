@@ -251,3 +251,89 @@ test("未確認の投稿が0件なら通知の数字を非表示にする", asyn
     await w.happyDOM.close();
   }
 });
+
+test("意見箱は表示数とページ移動を連動し、最後の投稿削除後は前のページへ戻る", async () => {
+  const w = win();
+  try {
+    w.document.write(adminPage());
+    w.confirm = () => true;
+    let rows = Array.from({ length: 21 }, (_, i) => ({
+      id: "post-" + i,
+      name: "投稿" + i,
+      message: "本文" + i,
+      status: "new",
+      created_at: "2026-10-13T00:00:00Z",
+    }));
+    const calls = [];
+    let fail = false;
+    w.fetch = async (url, options = {}) => {
+      if (String(url).endsWith("/me")) return Response.json({ role: "admin" });
+      if (options.method === "DELETE") {
+        rows = rows.filter((row) => !String(url).endsWith("/" + row.id));
+        return Response.json({ ok: true });
+      }
+      const query = new URL(url, "https://example.test").searchParams;
+      calls.push({
+        offset: Number(query.get("offset")),
+        limit: Number(query.get("limit")),
+        status: query.get("status"),
+      });
+      if (fail) return Response.json({}, { status: 500 });
+      const items = query.get("status") === "read" ? [] : rows;
+      return Response.json({
+        items: items.slice(
+          Number(query.get("offset")),
+          Number(query.get("offset")) + Number(query.get("limit")),
+        ),
+        total: items.length,
+        unread: rows.length,
+      });
+    };
+    const $ = (id) => w.document.getElementById(id);
+    w.eval(admin);
+    await settle();
+    assert.equal(w.document.querySelectorAll(".feedback-card").length, 10);
+    assert.equal($("feedback-prev").disabled, true);
+    assert.equal($("feedback-next").disabled, false);
+    assert.match($("feedback-page-info").textContent, /1–10件.*全21件/);
+    $("feedback-next").click();
+    await settle();
+    assert.equal(calls.at(-1).offset, 10);
+    assert.match($("feedback-page-info").textContent, /11–20件/);
+    $("feedback-limit").value = "20";
+    $("feedback-limit").dispatchEvent(new w.Event("change"));
+    await settle();
+    assert.equal(calls.at(-1).offset, 0);
+    assert.equal(calls.at(-1).limit, 20);
+    assert.equal(w.document.querySelectorAll(".feedback-card").length, 20);
+    $("feedback-next").click();
+    await settle();
+    assert.equal(w.document.querySelectorAll(".feedback-card").length, 1);
+    assert.equal($("feedback-next").disabled, true);
+    w.document.querySelector(".feedback-card .danger").click();
+    await settle();
+    assert.equal(calls.at(-1).offset, 0);
+    assert.equal(w.document.querySelectorAll(".feedback-card").length, 20);
+    assert.equal($("feedback-prev").disabled, true);
+    assert.equal($("feedback-next").disabled, true);
+    $("feedback-limit").value = "10";
+    $("feedback-limit").dispatchEvent(new w.Event("change"));
+    await settle();
+    fail = true;
+    $("feedback-next").click();
+    await settle();
+    assert.equal(w.document.querySelectorAll(".feedback-card").length, 10);
+    assert.match($("feedback-page-info").textContent, /1–10件/);
+    assert.match($("feedback-message").textContent, /取得・更新できません/);
+    assert.equal($("feedback-prev").disabled, true);
+    fail = false;
+    $("feedback-status").value = "read";
+    $("feedback-status").dispatchEvent(new w.Event("change"));
+    await settle();
+    assert.equal(calls.at(-1).offset, 0);
+    assert.equal($("feedback-pagination").hidden, true);
+    assert.equal($("feedback-page-info").textContent, "全0件");
+  } finally {
+    await w.happyDOM.close();
+  }
+});
