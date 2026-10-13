@@ -1,13 +1,16 @@
+import {parseVisibility} from '../shared/withdrawal-content.mjs';
 import { readFile, access, readdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import assert from 'node:assert/strict';
 import { loadRecords } from './validate-content.mjs';
 import { allMatches } from '../src/lib/finder.mjs';
 const records = await loadRecords();
+const hidden=new Set(parseVisibility(await readFile('src/content/withdrawn-articles.json','utf8')).withdrawals.map(row=>row.slug));
+const visible=r=>r.data.status==='published'&&!(r.collection==='articles'&&hidden.has(r.id));
 const index = JSON.parse(
   await readFile('dist/search-index.json', 'utf8'),
 );
-const published = records.filter((r) => r.data.status === 'published');
+const published = records.filter(visible);
 const manifest = JSON.parse(
   await readFile('dist/content-manifest.json', 'utf8'),
 );
@@ -24,7 +27,7 @@ for (const entry of published) {
   );
 }
 for (const entry of records.filter(
-  (r) => r.data.status !== 'published',
+  (r) => !visible(r),
 )) {
   assert.ok(!index.some((item) => item.title === entry.data.title));
   await assert.rejects(
@@ -53,7 +56,7 @@ for (const result of allMatches()) {
       `${result.slug}: 成分詳細へのリンク`,
     );
   assert.ok(
-    html.includes(`/articles/${result.area.article}/`),
+    html.includes(hidden.has(result.area.article)?'/articles/':`/articles/${result.area.article}/`),
     `${result.slug}: ケア記事へのリンク`,
   );
 }

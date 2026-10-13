@@ -1,3 +1,4 @@
+import {publications,requestWithdrawal,withdrawalManifest,markWithdrawalBuild} from './withdrawals.mjs';
 import { allowedOrigin, submitFeedback, listFeedback } from './feedback.mjs';
 import {
   approvedFiles,
@@ -270,6 +271,8 @@ app.delete("/api/admin/feedback/:id", async (c) => {
   if (!result.meta.changes) throw new ApiError(404, "not_found");
   return c.json({ ok: true });
 });
+app.get('/api/admin/publications',async(c)=>c.json(await publications(c.env,c.req.query())));
+app.post('/api/admin/publications/withdraw',async(c)=>c.json(await requestWithdrawal(c.env,await json(c,5000),c.get('admin')),201));
 app.get('/api/admin/me', (c) =>
   c.json({ email: c.get('admin'), role: c.get('role') }),
 );
@@ -796,6 +799,7 @@ app.post('/api/admin/articles/:id/review', async (c) => {
     .bind(id, body.revision)
     .first();
   if (!row) throw new ApiError(409, 'revision_conflict');
+  if(body.status==='published' && await c.env.DB.prepare('SELECT id FROM article_withdrawals WHERE slug=?').bind(row.slug).first()) throw new ApiError(409,'article_withdrawn');
   if (body.status === 'published' && row.ai_status !== 'complete')
     throw new ApiError(409, 'ai_processing_incomplete');
   if (body.status === 'published') {
@@ -959,6 +963,9 @@ app.use('/api/release/*', async (c, next) => {
     throw new ApiError(401, 'unauthorized');
   await next();
 });
+app.get('/api/release/withdrawals/pending',async(c)=>{const rows=await c.env.DB.prepare("SELECT id FROM article_withdrawals WHERE state='requested'").all();return c.json({ids:rows.results.map((row:any)=>row.id)});});
+app.get('/api/release/withdrawals',async(c)=>c.json(await withdrawalManifest(c.env)));
+app.post('/api/release/withdrawals/build',async(c)=>c.json(await markWithdrawalBuild(c.env,await json(c,50000))));
 app.get('/api/release/articles', async (c) =>
   c.json(await approvedFiles(c.env, c.req.query('cursor') || '')),
 );
@@ -1000,7 +1007,7 @@ app.get('/api/published/export', async (c) => {
     throw new ApiError(409, 'environment_mismatch');
   const rows = (
     await c.env.DB.prepare(
-      "SELECT id,slug,title,body_markdown,excerpt,category,tags,citations,updated_at,published_at,revision FROM articles WHERE status='published' AND published_at IS NOT NULL AND reviewed_by IS NOT NULL ORDER BY published_at DESC",
+      "SELECT id,slug,title,body_markdown,excerpt,category,tags,citations,updated_at,published_at,revision FROM articles a WHERE status='published' AND published_at IS NOT NULL AND reviewed_by IS NOT NULL AND NOT EXISTS(SELECT 1 FROM article_withdrawals w WHERE w.slug=a.slug) ORDER BY published_at DESC",
     ).all()
   ).results;
   return c.json({

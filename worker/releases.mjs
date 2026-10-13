@@ -63,7 +63,7 @@ async function currentArticle(env, id) {
   const raw = await env.DB.prepare(
     'SELECT ' +
       approvedColumns +
-      ",ai_check_notes FROM articles a WHERE id=? AND status='published' AND published_at IS NOT NULL AND reviewed_by IS NOT NULL AND ai_status='complete' AND NOT EXISTS(SELECT 1 FROM article_sources r JOIN sources s ON s.id=r.source_id WHERE r.article_id=a.id AND s.status='rejected')",
+      ",ai_check_notes FROM articles a WHERE id=? AND status='published' AND NOT EXISTS(SELECT 1 FROM article_withdrawals w WHERE w.slug=a.slug) AND published_at IS NOT NULL AND reviewed_by IS NOT NULL AND ai_status='complete' AND NOT EXISTS(SELECT 1 FROM article_sources r JOIN sources s ON s.id=r.source_id WHERE r.article_id=a.id AND s.status='rejected')",
   )
     .bind(id)
     .first();
@@ -91,7 +91,7 @@ export async function approvedFiles(env, cursor = '') {
     await env.DB.prepare(
       'SELECT ' +
         approvedColumns +
-        " FROM articles a WHERE status='published' AND published_at IS NOT NULL AND reviewed_by IS NOT NULL AND ai_status='complete' AND id>? AND NOT EXISTS(SELECT 1 FROM article_sources r JOIN sources s ON s.id=r.source_id WHERE r.article_id=a.id AND s.status='rejected') ORDER BY id LIMIT 51",
+        " FROM articles a WHERE status='published' AND NOT EXISTS(SELECT 1 FROM article_withdrawals w WHERE w.slug=a.slug) AND published_at IS NOT NULL AND reviewed_by IS NOT NULL AND ai_status='complete' AND id>? AND NOT EXISTS(SELECT 1 FROM article_sources r JOIN sources s ON s.id=r.source_id WHERE r.article_id=a.id AND s.status='rejected') ORDER BY id LIMIT 51",
     )
       .bind(cursor)
       .all()

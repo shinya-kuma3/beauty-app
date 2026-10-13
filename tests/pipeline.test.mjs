@@ -47,6 +47,7 @@ const releaseMigration = await readFile(
   'utf8',
 );
 const feedbackMigration=await readFile(new URL('../migrations/0006_feedback.sql',import.meta.url),'utf8');
+const withdrawalMigration=await readFile(new URL('../migrations/0007_article_withdrawals.sql',import.meta.url),'utf8');
 class D1 {
   constructor() {
     this.queries = 0;
@@ -57,6 +58,7 @@ class D1 {
     this.sql.exec(searchMigration);
     this.sql.exec(releaseMigration);
     this.sql.exec(feedbackMigration);
+    this.sql.exec(withdrawalMigration);
   }
   prepare(query) {
     this.queries++;
@@ -151,6 +153,7 @@ const answer = {
 };
 globalThis.fetch = async (input, options) => {
   const url = String(input);
+  if(url==='https://my-beauty-palette.com/content-manifest.json')return Response.json({environment:'production',withdrawals:[]});
   if (url === "https://challenges.cloudflare.com/turnstile/v0/siteverify") {
     const data = JSON.parse(options.body);
     if (data.response === "unavailable")
@@ -1931,4 +1934,29 @@ test('意見箱APIは状態ごとの全件数と指定表示数・ページを�
  assert.equal(first.data.total,59);assert.equal(first.data.items.length,20);assert.equal(last.data.items.length,19);assert.ok(last.data.items.every(row=>!first.data.items.some(item=>item.id===row.id)));
  const filtered=await request(e,'/api/admin/feedback?status=new&limit=10&offset=10','GET',undefined,true);assert.equal(filtered.data.total,30);assert.equal(filtered.data.unread,30);assert.equal(filtered.data.items.length,10);assert.ok(filtered.data.items.every(row=>row.status==='new'));
  assert.equal((await request(e,'/api/admin/feedback?limit=51','GET',undefined,true)).response.status,400);
+});
+
+test('非公開は管理者・編集者の理由付き承認が必要で、初期記事も管理できる',async()=>{
+ const e=env({RELEASE_API_KEY:'test-release-key'});e.DB.sql.prepare('INSERT INTO editors(email,active,updated_at,added_by) VALUES(?,1,?,?)').run('editor@example.test',new Date().toISOString(),'admin@example.test');
+ const found=await request(e,'/api/admin/publications','GET',undefined,'editor');assert.equal(found.response.status,200);const entry=found.data.items.find(row=>row.slug==='moisturizer-basics');assert.ok(entry);assert.equal(entry.origin,'initial');
+ const body={slug:entry.slug,revision_token:entry.revision_token,reason:'内容を再確認するため',confirmed:true};
+ assert.equal((await request(e,'/api/admin/publications/withdraw','POST',body)).response.status,403);
+ assert.equal((await request(e,'/api/admin/publications/withdraw','POST',{...body,reason:' '},true)).response.status,400);
+ assert.equal((await request(e,'/api/admin/publications/withdraw','POST',{...body,confirmed:false},true)).response.status,400);
+ assert.equal((await request(e,'/api/admin/publications/withdraw','POST',{...body,revision_token:'stale'},true)).response.status,409);
+ const result=await request(e,'/api/admin/publications/withdraw','POST',body,'editor');assert.equal(result.response.status,201);const again=await request(e,'/api/admin/publications/withdraw','POST',body,'editor');assert.equal(result.data.id,again.data.id);
+ const record=e.DB.sql.prepare('SELECT * FROM article_withdrawals').get();assert.equal(record.actor,'editor@example.test');assert.equal(record.reason,body.reason);
+ const manifest=await releaseRequest(e,'withdrawals');assert.deepEqual(manifest.data.withdrawals,[{id:result.data.id,slug:entry.slug}]);assert.ok(!JSON.stringify(manifest.data).includes('editor@example.test'));assert.ok(!JSON.stringify(manifest.data).includes(body.reason));
+ const built=await releaseRequest(e,'withdrawals/build','POST',{withdrawals:manifest.data.withdrawals,main_sha:'a'.repeat(40),build_id:crypto.randomUUID()});assert.equal(built.response.status,200);assert.equal(e.DB.sql.prepare('SELECT state FROM article_withdrawals').get().state,'building');
+ assert.throws(()=>e.DB.sql.prepare('DELETE FROM article_withdrawals').run(),/preserved/);
+});
+test('非公開依頼後は本文を残し、公開同期とGrokの古い本番反映を停止する',async()=>{
+ const f=await releaseFixture();const list=await request(f.e,'/api/admin/publications','GET',undefined,true);const item=list.data.items.find(row=>row.article_id===f.id);assert.ok(item);
+ const before=f.e.DB.sql.prepare('SELECT body_markdown FROM articles WHERE id=?').get(f.id).body_markdown;
+ const result=await request(f.e,'/api/admin/publications/withdraw','POST',{slug:item.slug,revision_token:item.revision_token,reason:'出典の再確認',confirmed:true},true);assert.equal(result.response.status,201);
+ assert.equal(f.e.DB.sql.prepare('SELECT body_markdown FROM articles WHERE id=?').get(f.id).body_markdown,before);
+ assert.equal((await releaseRequest(f.e,'articles')).data.files.length,0);
+ const old=await releaseRequest(f.e,'requests/'+f.started.id);assert.equal(old.response.status,409);
+ const re=await request(f.e,'/api/admin/articles/'+f.id+'/revise','POST',{revision:f.file.revision},true);assert.equal(re.response.status,200);await processAll(f.e);const revision=f.e.DB.sql.prepare('SELECT revision FROM articles WHERE id=?').get(f.id).revision;
+ const approved=await request(f.e,'/api/admin/articles/'+f.id+'/review','POST',{revision,status:'published',confirmed:true},true);assert.equal(approved.response.status,409);assert.equal(approved.data.error.code,'article_withdrawn');
 });

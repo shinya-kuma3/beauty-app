@@ -33,6 +33,7 @@ const states = {
   waiting_configuration: '公開設定待ち',
 };
 const messages = {
+  article_withdrawn: '非公開依頼済みの記事は、再公開できません。',
   unauthorized: '認証が必要です。',
   admin_access_required: '許可されたアカウントでログインしてください。',
   owner_required: 'この操作は管理者だけが行えます。',
@@ -98,9 +99,9 @@ async function action(task) {
   busy = true;
   document
     .querySelectorAll('input,select,textarea')
-    .forEach((f) => { if (!f.closest('#feedback-tools')) f.disabled = true; });
+    .forEach((f) => { if (!f.closest('#feedback-tools,#publication-tools,#withdraw-dialog')) f.disabled = true; });
   $('message').textContent = '処理しています…';
-  document.querySelectorAll('button').forEach((b) => { if (!b.closest('#feedback-tools')) b.disabled = true; });
+  document.querySelectorAll('button').forEach((b) => { if (!b.closest('#feedback-tools,#publication-tools,#withdraw-dialog')) b.disabled = true; });
   try {
     const message = await task();
     $('message').textContent =
@@ -111,10 +112,10 @@ async function action(task) {
     busy = false;
     document
       .querySelectorAll('input,select,textarea')
-      .forEach((f) => { if (!f.closest('#feedback-tools')) f.disabled = false; });
+      .forEach((f) => { if (!f.closest('#feedback-tools,#publication-tools,#withdraw-dialog')) f.disabled = false; });
     document
       .querySelectorAll('button')
-      .forEach((b) => { if (!b.closest('#feedback-tools')) b.disabled = false; });
+      .forEach((b) => { if (!b.closest('#feedback-tools,#publication-tools,#withdraw-dialog')) b.disabled = false; });
     updateActions();
   }
 }

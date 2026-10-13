@@ -1,4 +1,4 @@
 ---
-import MensHome from '../../src/components/MensHome.astro';
+import { mainSiteUrl } from '../../src/lib/content';
+return Astro.redirect(mainSiteUrl,301);
 ---
-<MensHome />

@@ -9,6 +9,8 @@ on:
       - '.github/workflows/content-release.yml'
       - 'scripts/content-release.mjs'
       - 'shared/release-content.mjs'
+      - 'scripts/withdrawal-release.mjs'
+      - 'shared/withdrawal-content.mjs'
 permissions:
   contents: write
 concurrency:

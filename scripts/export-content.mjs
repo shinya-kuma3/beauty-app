@@ -1,3 +1,4 @@
+import {parseVisibility} from '../shared/withdrawal-content.mjs';
 import {
   mkdir,
   readdir,
@@ -21,6 +22,8 @@ export async function exportContent(
   env = process.env,
   root = process.cwd(),
 ) {
+  let visibility={version:1,withdrawals:[]};try{visibility=parseVisibility(await readFile(resolve(root,'src/content/withdrawn-articles.json'),'utf8'));}catch(error){if(error.code!=='ENOENT')throw error;}
+  const hidden=new Set(visibility.withdrawals.map(row=>row.slug));
   const folder = resolve(root, 'src/content/generated-articles');
   await mkdir(folder, { recursive: true });
   for (const name of await readdir(folder)) {
@@ -114,9 +117,10 @@ export async function exportContent(
     resolve(root, 'public/content-manifest.json'),
     JSON.stringify({
       environment: expected,
+      withdrawals: visibility.withdrawals,
       articles: live
-        ? rows.map((row) => ({ id: row.id, revision: row.revision }))
-        : committed.map(({ id, revision, sha }) => ({
+        ? rows.filter(row=>!hidden.has(row.slug)).map((row) => ({ id: row.id, revision: row.revision }))
+        : committed.filter(row=>!hidden.has(row.slug)).map(({ id, revision, sha }) => ({
             id,
             revision,
             sha,

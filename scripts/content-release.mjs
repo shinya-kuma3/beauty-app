@@ -1,3 +1,5 @@
+import {syncWithdrawals} from './withdrawal-release.mjs';
+import {visibilityPath,validateAppend} from '../shared/withdrawal-content.mjs';
 import { writeFile, mkdir, readdir } from 'node:fs/promises';
 import { resolve, dirname, relative } from 'node:path';
 import { createHash } from 'node:crypto';
@@ -111,6 +113,15 @@ export class GitHub {
       blob.content.replace(/\s/g, ''),
       'base64',
     ).toString('utf8');
+  }
+  async visibility(head){const data=await this.api('/git/trees/'+head.tree+'?recursive=1');if(data.truncated)throw Error('Git tree truncated');const entry=data.tree.find(row=>row.path===visibilityPath);if(entry&&(entry.type!=='blob'||entry.mode!=='100644'))throw Error('Visibility must be a regular JSON file');return this.content(entry);}
+  async commitVisibility(branch,head,content){
+   validateAppend(await this.visibility(head),content);
+   if((await this.head(branch)).sha!==head.sha)throw Error('Branch changed; retry');
+   const blob=await this.api('/git/blobs','POST',{content:Buffer.from(content).toString('base64'),encoding:'base64'});
+   const tree=await this.api('/git/trees','POST',{base_tree:head.tree,tree:[{path:visibilityPath,mode:'100644',type:'blob',sha:blob.sha}]});
+   const commit=await this.api('/git/commits','POST',{message:'Apply human-approved article withdrawals',tree:tree.sha,parents:[head.sha]});
+   await this.api('/git/refs/heads/'+branch,'PATCH',{sha:commit.sha,force:false});return {sha:commit.sha,tree:tree.sha};
   }
   async commit(branch, head, files) {
     if (!files.length) return head;
@@ -419,7 +430,7 @@ export async function main() {
     return;
   }
   validateHook(env.CLOUDFLARE_PRODUCTION_DEPLOY_HOOK);
-  const result = await syncAndRelease({
+  const services = {
     github: new GitHub(env.GITHUB_TOKEN),
     release: new ReleaseClient(
       env.CONTENT_RELEASE_API_URL ||
@@ -429,7 +440,9 @@ export async function main() {
     verify: verifyCandidate,
     trigger: () =>
       triggerProduction(env.CLOUDFLARE_PRODUCTION_DEPLOY_HOOK),
-  });
+  };
+  const withdrawal=await syncWithdrawals({...services,verify:async(content,sha)=>{await writeFile(resolve('src/content/withdrawn-articles.json'),content);await verifyCandidate([],sha);}});
+  const result=withdrawal.changed?withdrawal:await syncAndRelease(services);
   console.log(JSON.stringify(result));
   if (env.GITHUB_STEP_SUMMARY)
     await writeFile(

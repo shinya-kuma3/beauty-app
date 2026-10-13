@@ -1,12 +1,11 @@
 ---
 import '../styles/global.css';
 import Icon from '../components/Icon.astro';
-import { pathTo, mainPathTo, mensPathTo, isMensSite } from '../lib/content';
+import { pathTo, mainPathTo, isMensSite } from '../lib/content';
 interface Props { title?: string; description?: string; active?: string; theme?: 'default' | 'mens'; }
 const { title = '私らしいケアの彩りを', description = '肌・髪・爪・身体の美容ライブラリ。成分図鑑、ケア記事と成分診断から、自分に合うケアのヒントを。', active = 'home', theme = 'default' } = Astro.props;
 const nav = [{ label: 'ホーム', path: '', id: 'home' }, { label: '成分図鑑', path: 'ingredients/', id: 'ingredients' }, { label: 'ケア記事', path: 'articles/', id: 'articles' }, { label: '成分診断', path: 'finder/', id: 'finder' }];
 const canonical = Astro.site ? new URL(Astro.url.pathname, Astro.site).href : undefined;
-const isMensView = isMensSite || active === 'mens';
 ---
 <!doctype html>
 <html lang="ja">
@@ -24,10 +23,10 @@ const isMensView = isMensSite || active === 'mens';
     <header class="header"><div class="shell header-inner">
       <a class="brand" href={pathTo()} aria-label="my beauty palette ホーム"><span class="brand-symbol"><Icon name="drop" size={23} /></span><span>my beauty <span class="brand-note">palette</span><small>肌・髪・爪・身体の、美容ライブラリ</small></span></a>
       <nav aria-label="メインナビゲーション">{nav.map((item) => <a class:list={{ active: active === item.id }} href={isMensSite && item.id === 'home' ? pathTo() : mainPathTo(item.path)} aria-current={active === item.id ? 'page' : undefined}>{item.label}</a>)}</nav>
-      <div class="header-actions"><a class="header-search" href={mainPathTo('search/')} aria-label="成分や記事を検索"><Icon name="search" size={20} /></a><a class:list={['mens-button', { 'main-site-button': isMensView }]} href={isMensView ? mainPathTo() : mensPathTo()}>{isMensView ? '総合トップ' : 'メンズケア'}<Icon name="arrow" size={15} /></a></div>
+      <div class="header-actions"><a class="header-search" href={mainPathTo('search/')} aria-label="成分や記事を検索"><Icon name="search" size={20} /></a></div>
     </div></header>
     <main id="main"><slot /></main>
-    <footer class="footer"><div class="shell footer-top"><div><a class="brand footer-brand" href={pathTo()}>my beauty <span class="brand-note">palette</span></a><p>知ることから、心地よいケアへ。</p></div><div class="footer-links"><a href={mainPathTo('ingredients/')}>成分図鑑</a><a href={mainPathTo('articles/')}>ケア記事</a><a href={mainPathTo('finder/')}>成分診断</a><a href={mensPathTo()}>メンズケア</a><a href={mainPathTo('about/')}>このサイトについて</a><a href={mainPathTo('feedback/')}>意見箱</a><a href={mainPathTo('license/')}>ライセンス</a></div></div><div class="shell footer-bottom"><span>© {new Date().getFullYear()} my beauty palette</span><span>自分をいたわる、小さな知識の積み重ね。</span></div></footer>
+    <footer class="footer"><div class="shell footer-top"><div><a class="brand footer-brand" href={pathTo()}>my beauty <span class="brand-note">palette</span></a><p>知ることから、心地よいケアへ。</p></div><div class="footer-links"><a href={mainPathTo('ingredients/')}>成分図鑑</a><a href={mainPathTo('articles/')}>ケア記事</a><a href={mainPathTo('finder/')}>成分診断</a><a href={mainPathTo('about/')}>このサイトについて</a><a href={mainPathTo('feedback/')}>意見箱</a><a href={mainPathTo('license/')}>ライセンス</a></div></div><div class="shell footer-bottom"><span>© {new Date().getFullYear()} my beauty palette</span><span>自分をいたわる、小さな知識の積み重ね。</span></div></footer>
   </body>
 </html>
 <script>

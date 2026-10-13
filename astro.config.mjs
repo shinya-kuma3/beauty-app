@@ -18,11 +18,12 @@ export default defineConfig({
     'import.meta.env.PUBLIC_MENS_SITE_URL': JSON.stringify(sameOriginMens ? '' : urls.mens),
   } },
   integrations: [{
-    name: 'cloudflare-mens-redirect',
+    name: 'retired-care-redirects',
     hooks: { 'astro:build:done': async ({ dir }) => {
-      if (sameOriginMens) return;
-      const path = `${base.replace(/\/$/, '')}/mens`;
-      await writeFile(new URL('_redirects', dir), `${path} ${urls.mens} 301\n${path}/ ${urls.mens} 301\n`);
+
+      const prefix=base.replace(/\/$/,'');
+      const path = `${prefix}/mens`;
+      await writeFile(new URL('_redirects', dir), `${path} ${prefix}/ 301\n${path}/ ${prefix}/ 301\n${prefix}/articles/mens-care-basics ${prefix}/articles/ 301\n${prefix}/articles/mens-care-basics/ ${prefix}/articles/ 301\n`);
     } },
   }],
 });
