@@ -1,0 +1,50 @@
+{
+  "title": "BHA（β-ヒドロキシ酸）",
+  "englishName": "Beta Hydroxy Acids (BHAs)",
+  "summary": "化粧品では主にサリチル酸を指す、角質ケアの分類名。成分表示の個別名称を確認し、小さな範囲で試して、製品の使用回数や部位を守ります。",
+  "category": "skin",
+  "areas": [
+    "skin",
+    "body"
+  ],
+  "role": "角質ケア",
+  "tags": [
+    "BHA",
+    "β-ヒドロキシ酸",
+    "ベータヒドロキシ酸",
+    "サリチル酸",
+    "Salicylic acid",
+    "角質ケア",
+    "ピーリング",
+    "スキンケア"
+  ],
+  "sections": [
+    {
+      "heading": "化粧品でのBHAという呼び方",
+      "body": "BHAはβ（ベータ）ヒドロキシ酸の略称で、化粧品では主にサリチル酸（Salicylic acid）を指します。米国食品医薬品局（FDA）は、サリチル酸が厳密な化学上のBHAには当たらないことも注記しています。製品を選ぶときは、分類名だけでなく成分表示の個別名称を確認しましょう。"
+    },
+    {
+      "heading": "角質ケアに使われる成分",
+      "body": "FDAはAHAとBHAを角質ケアに使われる成分として紹介しています。成分名だけから、毛穴や肌悩みへの効き目を判断することはできません。肌の状態と製品の処方を見て、普段の角質ケアやレチノール製品との重ね使いにも注意してください。"
+    },
+    {
+      "heading": "小さな範囲で試してから",
+      "body": "FDAはBHAを含む製品を広い範囲に使う前に、小さな範囲で試すよう案内しています。ラベルの使用方法と回数を守り、日焼け対策も行いましょう。刺激やひりつきが続く場合は使用を中止し、医療機関へ相談してください。"
+    }
+  ],
+  "caution": "傷・炎症・日焼けのある部位には使用しないでください。FDAは乳幼児や子どもへのBHA配合化粧品の使用を避けるよう案内しています。成人向けの角質ケア製品を子どもに流用しないでください。",
+  "sources": [
+    {
+      "title": "FDA — Beta Hydroxy Acids",
+      "url": "https://www.fda.gov/cosmetics/cosmetic-ingredients/beta-hydroxy-acids",
+      "kind": "official"
+    },
+    {
+      "title": "AAD — How to safely exfoliate at home",
+      "url": "https://www.aad.org/public/everyday-care/skin-care-secrets/routine/safely-exfoliate-at-home",
+      "kind": "guideline"
+    }
+  ],
+  "status": "published",
+  "updatedAt": "2026-10-13"
+}

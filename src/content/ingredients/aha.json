@@ -1,0 +1,50 @@
+{
+  "title": "AHA（α-ヒドロキシ酸）",
+  "englishName": "Alpha Hydroxy Acids (AHAs)",
+  "summary": "グリコール酸や乳酸など、角質ケアに使われる酸のグループ。個別の成分名と濃度・pHを確認し、製品の使い方と日焼け対策を合わせて考えます。",
+  "category": "skin",
+  "areas": [
+    "skin",
+    "body"
+  ],
+  "role": "角質ケア",
+  "tags": [
+    "AHA",
+    "α-ヒドロキシ酸",
+    "アルファヒドロキシ酸",
+    "グリコール酸",
+    "乳酸",
+    "角質ケア",
+    "ピーリング",
+    "スキンケア"
+  ],
+  "sections": [
+    {
+      "heading": "AHAは成分グループの名前",
+      "body": "AHAはα（アルファ）ヒドロキシ酸の略称です。代表的な成分はグリコール酸と乳酸。米国食品医薬品局（FDA）は、角質ケアのほか、製品のpH調整に使われる場合もあると説明しています。成分表示では個別の名称を確認しましょう。"
+    },
+    {
+      "heading": "強さは濃度や処方で変わる",
+      "body": "FDAによると、角質への作用は酸の種類・濃度・pH・ほかの配合成分によって異なります。AHAという名前だけで使用感や刺激の強さは決まりません。回数や使用部位は製品の説明を確認し、普段の角質ケアやレチノール製品との重ね使いにも注意してください。"
+    },
+    {
+      "heading": "日焼け対策と合わせて使う",
+      "body": "AHAを含む製品は、肌が紫外線の影響を受けやすくなる場合があります。FDAは使用中と使用をやめた後1週間も、日焼け止めや衣服などで日差しを避けるよう案内しています。角質ケアの後は保湿も大切です。"
+    }
+  ],
+  "caution": "傷や日焼けのある部位には使用しないでください。使いすぎは赤みや刺激につながることがあります。製品の使用時間・頻度を守り、強い刺激や赤みが出たときは使用を中止してください。",
+  "sources": [
+    {
+      "title": "FDA — Alpha Hydroxy Acids",
+      "url": "https://www.fda.gov/cosmetics/cosmetic-ingredients/alpha-hydroxy-acids",
+      "kind": "official"
+    },
+    {
+      "title": "AAD — How to safely exfoliate at home",
+      "url": "https://www.aad.org/public/everyday-care/skin-care-secrets/routine/safely-exfoliate-at-home",
+      "kind": "guideline"
+    }
+  ],
+  "status": "published",
+  "updatedAt": "2026-10-13"
+}
