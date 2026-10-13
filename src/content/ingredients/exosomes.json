@@ -1,0 +1,57 @@
+{
+  "title": "エクソソーム",
+  "englishName": "Exosomes / Extracellular Vesicles (EVs)",
+  "summary": "細胞が放出する細胞外小胞の一種を指す研究用語。美容分野でも使われますが、原料の由来や確認方法、含まれるもの、使用方法を確かめることが大切です。",
+  "category": "skin",
+  "areas": [
+    "skin"
+  ],
+  "role": "細胞外小胞",
+  "tags": [
+    "エクソソーム",
+    "エクソゾーム",
+    "Exosomes",
+    "細胞外小胞",
+    "EV",
+    "スキンケア",
+    "研究"
+  ],
+  "sections": [
+    {
+      "heading": "エクソソームとは？",
+      "body": "エクソソームは、細胞が放出する細胞外小胞（Extracellular Vesicles／EVs）の一種です。研究上は細胞内のエンドソームに由来する小胞を指します。単一の化学成分や、幹細胞そのものの名前ではありません。"
+    },
+    {
+      "heading": "名称と原料の実態を確認する",
+      "body": "国際細胞外小胞学会の研究指針MISEV2023では、小胞の由来や分離・確認方法を明確にすることが重視されています。小さい粒子という情報だけでは、エクソソームと確認できたことにはなりません。培養上清などの混合物と、小胞を確認・分離した試料も分けて考えます。"
+    },
+    {
+      "heading": "研究結果と化粧品の情報を分ける",
+      "body": "細胞実験や医療の研究で扱われる試料と、塗る化粧品の原料は条件が異なる場合があります。原料の由来・品質・保存方法・製品中での状態・使用方法を確認し、名前だけから肌への働きや安全性を判断しないようにしましょう。"
+    },
+    {
+      "heading": "医療用途の情報を読むとき",
+      "body": "米国食品医薬品局（FDA）の2019年の安全性通知は、エクソソームを含むと宣伝された未承認の治療用製品での有害事象を扱っています。医療用途や注射・施術を検討する場合は、承認状況・根拠・リスクを医師に確認してください。"
+    }
+  ],
+  "caution": "「エクソソーム配合」などの表現は、その製品の効果や安全性の保証ではありません。化粧品は表示された使い方を守り、刺激・赤み・かゆみが出た場合は使用を中止してください。医療用途は化粧品の説明と分けて確認しましょう。",
+  "sources": [
+    {
+      "title": "MISEV2023 — Minimal information for studies of extracellular vesicles: From basic to advanced approaches",
+      "url": "https://pubmed.ncbi.nlm.nih.gov/38326288/",
+      "kind": "guideline"
+    },
+    {
+      "title": "FDA — Public Safety Notification on Exosome Products (2019)",
+      "url": "https://www.fda.gov/vaccines-blood-biologics/safety-availability-biologics/public-safety-notification-exosome-products",
+      "kind": "official"
+    },
+    {
+      "title": "AAD — How to test skin care products",
+      "url": "https://www.aad.org/public/everyday-care/skin-care-secrets/prevent-skin-problems/test-skin-care-products/",
+      "kind": "guideline"
+    }
+  ],
+  "status": "published",
+  "updatedAt": "2026-10-13"
+}

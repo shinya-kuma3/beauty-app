@@ -1,0 +1,64 @@
+{
+  "title": "シカ（ツボクサ由来成分）",
+  "englishName": "Cica / Centella asiatica",
+  "summary": "ツボクサエキスや、その植物に含まれるマデカッソシドなどを扱うスキンケアで使われる呼び名。単一の成分名ではないため、製品の実際の配合内容を確認します。",
+  "category": "skin",
+  "areas": [
+    "skin",
+    "body"
+  ],
+  "role": "植物由来・整肌",
+  "tags": [
+    "シカ",
+    "CICA",
+    "ツボクサ",
+    "ツボクサエキス",
+    "Centella asiatica",
+    "マデカッソシド",
+    "アシアチコシド",
+    "整肌"
+  ],
+  "sections": [
+    {
+      "heading": "シカとツボクサの関係",
+      "body": "シカ（Cica）は、ツボクサやその由来成分に関連したスキンケアで使われる呼び名です。単一の化学成分の正式名称ではありません。このページでは植物のツボクサ（Centella asiatica）と、その由来成分を紹介します。"
+    },
+    {
+      "heading": "成分表示で見る名称",
+      "body": "ツボクサエキスや、ツボクサに含まれるマデカッソシド・アシアチコシドなどが関連する名称です。抽出物と個別の成分は同じものではなく、成分の構成や配合量も異なります。「シカ」と書かれていることだけで、配合内容が同じとは判断できません。"
+    },
+    {
+      "heading": "研究で使われた製品を確かめる",
+      "body": "ツボクサエキスを含むクリームやジェルについて、25人の参加者が4週間、前腕に使用した研究があります。水分量などを測った研究ですが、特定の配合と使用条件の結果です。すべてのシカ製品が同じ働きをすることや、ニキビ・傷を治すことを示すものではありません。"
+    },
+    {
+      "heading": "植物由来でも肌との相性を確認する",
+      "body": "製品の成分表示を見て、ツボクサ由来成分だけでなく香料などほかの配合成分も確認しましょう。新しい製品は小さな範囲で試し、赤み・かゆみ・腫れなどが出た場合は使用を中止してください。"
+    }
+  ],
+  "caution": "植物由来だから刺激やアレルギーが起こらないとは限りません。「シカ」や「敏感肌向け」という表現だけで肌に合うと判断せず、製品の使い方と肌の状態を確認してください。傷・湿疹などの治療目的では医療機関へ相談しましょう。",
+  "sources": [
+    {
+      "title": "Centella asiatica in cosmetology",
+      "url": "https://pubmed.ncbi.nlm.nih.gov/24278045/",
+      "kind": "research"
+    },
+    {
+      "title": "Moisturizing and Antiinflammatory Properties of Cosmetic Formulations Containing Centella asiatica Extract",
+      "url": "https://pubmed.ncbi.nlm.nih.gov/27168678/",
+      "kind": "research"
+    },
+    {
+      "title": "CIR — Safety Assessment of Centella asiatica-Derived Ingredients as Used in Cosmetics",
+      "url": "https://pubmed.ncbi.nlm.nih.gov/36812692/",
+      "kind": "official"
+    },
+    {
+      "title": "AAD — How to test skin care products",
+      "url": "https://www.aad.org/public/everyday-care/skin-care-secrets/prevent-skin-problems/test-skin-care-products/",
+      "kind": "guideline"
+    }
+  ],
+  "status": "published",
+  "updatedAt": "2026-10-13"
+}
