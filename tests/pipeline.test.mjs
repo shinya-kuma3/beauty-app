@@ -46,6 +46,7 @@ const releaseMigration = await readFile(
   new URL('../migrations/0005_content_releases.sql', import.meta.url),
   'utf8',
 );
+const feedbackMigration=await readFile(new URL('../migrations/0006_feedback.sql',import.meta.url),'utf8');
 class D1 {
   constructor() {
     this.queries = 0;
@@ -55,6 +56,7 @@ class D1 {
     this.sql.exec(roleMigration);
     this.sql.exec(searchMigration);
     this.sql.exec(releaseMigration);
+    this.sql.exec(feedbackMigration);
   }
   prepare(query) {
     this.queries++;
@@ -149,6 +151,19 @@ const answer = {
 };
 globalThis.fetch = async (input, options) => {
   const url = String(input);
+  if (url === "https://challenges.cloudflare.com/turnstile/v0/siteverify") {
+    const data = JSON.parse(options.body);
+    if (data.response === "unavailable")
+      return new Response("", { status: 503 });
+    return Response.json({
+      success: data.response !== "invalid",
+      hostname:
+        data.response === "wrong-host"
+          ? "evil.example"
+          : "develop-beauty-app.sinyak4649.workers.dev",
+      action: data.response === "wrong-action" ? "login" : "feedback",
+    });
+  }
   if (url.includes('/cdn-cgi/access/certs'))
     return Response.json({ keys: [jwk] });
   if (url.startsWith('https://generativelanguage.googleapis.com/')) {
@@ -1760,4 +1775,151 @@ test('公開記事の改訂は人の操作だけで作り、再承認前の版�
       )
       .get(f.id, f.file.revision),
   );
+});
+
+const feedbackOrigin = "https://develop-beauty-app.sinyak4649.workers.dev";
+const feedbackEnv = () =>
+  env({ TURNSTILE_SECRET_KEY: "unit-secret", TURNSTILE_SITE_KEY: "unit-site" });
+const submission = () => ({
+  id: crypto.randomUUID(),
+  message: "もっと髪の成分を紹介してほしいです。",
+  token: "valid",
+});
+const sendFeedback = (e, body, origin = feedbackOrigin, ip = "192.0.2.1") =>
+  app.request(
+    base + "/api/feedback",
+    {
+      method: "POST",
+      headers: {
+        Origin: origin,
+        "Content-Type": "application/json",
+        "CF-Connecting-IP": ip,
+      },
+      body: JSON.stringify(body),
+    },
+    e,
+  );
+test("意見箱は任意の名前・メールを許可し、Turnstile成功時だけ保存する", async () => {
+  const e = feedbackEnv(),
+    body = submission();
+  let r = await sendFeedback(e, body);
+  assert.equal(r.status, 201);
+  assert.equal(r.headers.get("Access-Control-Allow-Origin"), feedbackOrigin);
+  const row = e.DB.sql.prepare("SELECT * FROM feedback").get();
+  assert.equal(row.name, null);
+  assert.equal(row.email, null);
+  assert.equal(row.message, body.message);
+  r = await sendFeedback(e, body);
+  assert.equal(r.status, 201);
+  assert.equal(e.DB.sql.prepare("SELECT count(*) n FROM feedback").get().n, 1);
+  r = await sendFeedback(e, { ...body, message: "変更された本文" });
+  assert.equal(r.status, 409);
+});
+test("意見箱は不正な確認・別ホスト・不正入力・許可外Originを保存しない", async () => {
+  for (const body of [
+    { ...submission(), token: "invalid" },
+    { ...submission(), token: "wrong-host" },
+    { ...submission(), token: "wrong-action" },
+    { ...submission(), message: "  " },
+    { ...submission(), email: "not-email" },
+    { ...submission(), company_website: "bot" },
+    { ...submission(), message: "a".repeat(5001) },
+  ]) {
+    const e = feedbackEnv();
+    assert.equal((await sendFeedback(e, body)).status, 400);
+    assert.equal(
+      e.DB.sql.prepare("SELECT count(*) n FROM feedback").get().n,
+      0,
+    );
+  }
+  const e = feedbackEnv();
+  const r = await sendFeedback(e, submission(), "https://evil.example");
+  assert.equal(r.status, 403);
+  assert.equal(r.headers.get("Access-Control-Allow-Origin"), null);
+  assert.equal((await sendFeedback(env(), submission())).status, 503);
+  const options = await app.request(
+    base + "/api/feedback",
+    { method: "OPTIONS", headers: { Origin: feedbackOrigin } },
+    e,
+  );
+  assert.equal(options.status, 204);
+  assert.equal(
+    options.headers.get("Access-Control-Allow-Origin"),
+    feedbackOrigin,
+  );
+  const config = await app.request(base + "/api/feedback/config", {}, e);
+  const text = await config.text();
+  assert.ok(!text.includes("unit-secret"));
+  assert.equal(JSON.parse(text).enabled, true);
+});
+test("意見箱の回数制限は共有DBで制御し、IPを平文保存しない", async () => {
+  const e = feedbackEnv();
+  for (let i = 0; i < 3; i++)
+    assert.equal((await sendFeedback(e, submission())).status, 201);
+  assert.equal((await sendFeedback(e, submission())).status, 429);
+  const rows = e.DB.sql.prepare("SELECT bucket FROM rate_limits").all();
+  assert.ok(rows.every((row) => !row.bucket.includes("192.0.2.1")));
+  assert.equal(
+    (await sendFeedback(e, submission(), feedbackOrigin, "192.0.2.2")).status,
+    201,
+  );
+});
+test("投稿の個人情報は管理者だけが確認・変更・削除できる", async () => {
+  const e = feedbackEnv(),
+    body = { ...submission(), name: "投稿者", email: "reader@example.test" };
+  await sendFeedback(e, body);
+  e.DB.sql
+    .prepare(
+      "INSERT INTO editors(email,active,updated_at,added_by) VALUES(?,1,?,?)",
+    )
+    .run("editor@example.test", new Date().toISOString(), "admin@example.test");
+  for (const auth of [false, "editor"])
+    for (const method of ["GET", "PATCH", "DELETE"]) {
+      const result = await request(
+        e,
+        "/api/admin/feedback" + (method === "GET" ? "" : "/" + body.id),
+        method,
+        method === "PATCH" ? { status: "read" } : undefined,
+        auth,
+      );
+      assert.equal(result.response.status, 403);
+    }
+  const list = await request(e, "/api/admin/feedback", "GET", undefined, true);
+  assert.equal(list.data.items[0].email, body.email);
+  assert.equal(list.data.unread, 1);
+  const mark = await request(
+    e,
+    "/api/admin/feedback/" + body.id,
+    "PATCH",
+    { status: "read" },
+    true,
+  );
+  assert.equal(mark.response.status, 200);
+  assert.equal(
+    e.DB.sql.prepare("SELECT reviewed_by FROM feedback").get().reviewed_by,
+    "admin@example.test",
+  );
+  const deletion = await request(
+    e,
+    "/api/admin/feedback/" + body.id,
+    "DELETE",
+    undefined,
+    true,
+  );
+  assert.equal(deletion.response.status, 200);
+  assert.equal(e.DB.sql.prepare("SELECT count(*) n FROM feedback").get().n, 0);
+});
+
+test("Turnstile停止時と大きすぎるリクエストを保存せず拒否する", async () => {
+  const e = feedbackEnv();
+  assert.equal(
+    (await sendFeedback(e, { ...submission(), token: "unavailable" })).status,
+    503,
+  );
+  const huge = await sendFeedback(e, {
+    ...submission(),
+    message: "a".repeat(22000),
+  });
+  assert.equal(huge.status, 413);
+  assert.equal(e.DB.sql.prepare("SELECT count(*) n FROM feedback").get().n, 0);
 });

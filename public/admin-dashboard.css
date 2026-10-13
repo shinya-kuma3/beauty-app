@@ -658,3 +658,5 @@ button.danger:focus-visible {
   background: #fff0f0;
   border-color: #e7b0b8;
 }
+
+.feedback-card{padding:24px 0;border-bottom:1px solid #d5e6f3}.feedback-card h3{margin:0}.feedback-body{white-space:pre-wrap;overflow-wrap:anywhere}.feedback-card .danger{background:#fff0f1;color:#a6253a;border-color:#e5b2bb}.feedback-card .danger:hover{background:#ffe3e7}

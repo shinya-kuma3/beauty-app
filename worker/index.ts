@@ -1,3 +1,4 @@
+import { allowedOrigin, submitFeedback, listFeedback } from './feedback.mjs';
 import {
   approvedFiles,
   requestRelease,
@@ -118,12 +119,41 @@ app.onError((error: any, c) => {
     status as any,
   );
 });
+// Only the anonymous feedback endpoints allow cross-origin requests.
+app.use("/api/feedback*", async (c, next) => {
+  const origin = c.req.header("Origin");
+  if (allowedOrigin(origin, c.env)) {
+    c.header("Access-Control-Allow-Origin", origin!);
+    c.header("Vary", "Origin");
+    c.header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+    c.header("Access-Control-Allow-Headers", "Content-Type");
+  }
+  if (c.req.method === "OPTIONS") return c.body(null, 204);
+  await next();
+});
 app.use('/api/*', async (c, next) => {
   c.header('Cache-Control', 'no-store');
   c.header('X-Content-Type-Options', 'nosniff');
   if (!c.env.DB) throw new ApiError(503, 'database_not_configured');
   await next();
 });
+app.get("/api/feedback/config", (c) =>
+  c.json({
+    enabled: !!(c.env.TURNSTILE_SITE_KEY && c.env.TURNSTILE_SECRET_KEY),
+    sitekey: c.env.TURNSTILE_SITE_KEY || null,
+  }),
+);
+app.post("/api/feedback", async (c) =>
+  c.json(
+    await submitFeedback(
+      c.env,
+      await json(c, 20000),
+      c.req.header("Origin"),
+      c.req.header("CF-Connecting-IP"),
+    ),
+    201,
+  ),
+);
 app.use('/api/ingest/*', async (c, next) => {
   if (
     !(await secureEqual(
@@ -198,6 +228,8 @@ const ownersOnly = async (c: any, next: any) => {
   await next();
 };
 for (const path of [
+  '/api/admin/feedback',
+  '/api/admin/feedback/*',
   '/api/admin/editors',
   '/api/admin/editors/*',
   '/api/admin/operations',
@@ -208,6 +240,36 @@ for (const path of [
   '/api/admin/articles/*/retry-build',
 ])
   app.use(path, ownersOnly);
+app.get("/api/admin/feedback", async (c) =>
+  c.json(await listFeedback(c.env.DB, c.req.query())),
+);
+app.patch("/api/admin/feedback/:id", async (c) => {
+  const input = await json(c, 1000);
+  if (
+    !["new", "read"].includes(input.status) ||
+    Object.keys(input).some((k) => k !== "status")
+  )
+    throw new ApiError(400, "invalid_status");
+  const result = await c.env.DB.prepare(
+    "UPDATE feedback SET status=?,reviewed_at=?,reviewed_by=? WHERE id=?",
+  )
+    .bind(
+      input.status,
+      input.status === "read" ? now() : null,
+      input.status === "read" ? c.get("admin") : null,
+      c.req.param("id"),
+    )
+    .run();
+  if (!result.meta.changes) throw new ApiError(404, "not_found");
+  return c.json({ ok: true });
+});
+app.delete("/api/admin/feedback/:id", async (c) => {
+  const result = await c.env.DB.prepare("DELETE FROM feedback WHERE id=?")
+    .bind(c.req.param("id"))
+    .run();
+  if (!result.meta.changes) throw new ApiError(404, "not_found");
+  return c.json({ ok: true });
+});
 app.get('/api/admin/me', (c) =>
   c.json({ email: c.get('admin'), role: c.get('role') }),
 );

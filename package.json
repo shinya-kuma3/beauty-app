@@ -22,7 +22,8 @@
     "setup:cloudflare": "node scripts/setup-cloudflare.mjs",
     "sample:ai": "node scripts/sample-ai.mjs",
     "deploy:preview": "node scripts/deploy-preview.mjs",
-    "publish:content": "node scripts/content-release.mjs"
+    "publish:content": "node scripts/content-release.mjs",
+    "licenses:generate": "node scripts/generate-notices.mjs"
   },
   "dependencies": {
     "astro": "7.3.6",

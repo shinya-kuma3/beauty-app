@@ -43,7 +43,8 @@
       "ENABLE_SCHEDULED": "false",
       "AI_DAILY_CALL_LIMIT": "30",
       "AI_DAILY_TOKEN_LIMIT": "600000",
-      "CONTENT_DELIVERY_MODE": "github"
+      "CONTENT_DELIVERY_MODE": "github",
+      "TURNSTILE_SITE_KEY": "0x4AAAAAAFVLuOPlCMXYhQKL"
     }
   },
   "assets": {

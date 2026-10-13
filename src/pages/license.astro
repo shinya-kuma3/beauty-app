@@ -1,0 +1,15 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { pathTo } from '../lib/content';
+const libraries=[['Astro','MIT','https://github.com/withastro/astro'],['Hono','MIT','https://github.com/honojs/hono'],['jose','MIT','https://github.com/panva/jose'],['markdown-it','MIT','https://github.com/markdown-it/markdown-it'],['Zod','MIT','https://github.com/colinhacks/zod']];
+---
+<Layout title="利用・転載ルールとライセンス" description="サイトの文章・画像の利用と、素材・ライブラリの著作権表示について。">
+ <article class="shell section license-page"><p class="eyebrow">RESPECT EVERY PALETTE.</p><h1>利用・転載ルールとライセンス</h1><p>このページでは、サイトのオリジナルコンテンツの扱いと、制作に使用した素材・ソフトウェアを案内します。</p>
+ <section><h2>オリジナルの文章・画像について</h2><p>my beauty paletteが制作した文章、イラスト、アイコン、デザインの著作権は、my beauty paletteの権利者に帰属します。オリジナルの文章・画像の全文転載や再配布をご希望の場合は、事前に<a href={pathTo('feedback/')}>意見箱</a>からご相談ください。出典を表示するだけで、全文転載・再配布が許可されるものではありません。</p><p>トップの5種類のイラストとサイトのSVGアイコンは、このサイト向けに制作しています。</p></section>
+ <section><h2>引用とリンクについて</h2><p>法令上認められる引用を妨げるものではありません。引用する場合は、ご自身の文章と引用部分を明確に区別し、引用元のページ名・サイト名・URLを表示してください。引用の範囲や条件は、適用される法令に従ってください。</p><p>サイトや各ページへのリンクは歓迎します。リンク元の内容について、このサイトが推奨・保証していると誤解される表示はお控えください。</p></section>
+ <section><h2>第三者のコンテンツについて</h2><p>出典として紹介する研究、記事、動画、商品名などの権利は、それぞれの権利者に帰属します。出典リンクや紹介は、そのコンテンツの転載許可を意味しません。利用する際は、元の公開元の条件をご確認ください。</p></section>
+ <section><h2>フォント</h2><p>日本語の表示にはGoogle Fonts経由でNoto Sans JPとNoto Serif JPを使用しています。これらのフォントには<a href="https://github.com/notofonts/noto-cjk/blob/main/Sans/LICENSE" target="_blank" rel="noopener noreferrer">SIL Open Font License 1.1（Noto Sans）</a>および<a href="https://github.com/notofonts/noto-cjk/blob/main/Serif/LICENSE" target="_blank" rel="noopener noreferrer">同ライセンス（Noto Serif）</a>が適用されます。著作権表示と全文は各ライセンスをご確認ください。</p></section>
+ <section><h2>ソフトウェア</h2><p>主な利用ライブラリは以下のとおりです。各ライセンスは、それぞれのソフトウェアに適用されます。サイトのオリジナル文章・画像の利用条件とは別です。</p><table><thead><tr><th scope="col">ライブラリ</th><th scope="col">ライセンス</th></tr></thead><tbody>{libraries.map(([name,license,url])=><tr><td><a href={url} target="_blank" rel="noopener noreferrer">{name}</a></td><td>{license}</td></tr>)}</tbody></table><p>依存ライブラリを含む著作権・ライセンスの表示は、<a href={pathTo('third-party-licenses.txt')}>第三者ソフトウェアのライセンス全文</a>にまとめています。</p></section>
+ <section><h2>外部サービス</h2><p>配信・管理にはCloudflare、意見箱のボット対策にはCloudflare Turnstile、フォント配信にはGoogle Fontsを使用しています。サービス名や商標の権利は、各権利者に帰属します。</p></section>
+ </article>
+</Layout>
