@@ -48,6 +48,7 @@ const releaseMigration = await readFile(
 );
 const feedbackMigration=await readFile(new URL('../migrations/0006_feedback.sql',import.meta.url),'utf8');
 const withdrawalMigration=await readFile(new URL('../migrations/0007_article_withdrawals.sql',import.meta.url),'utf8');
+const billingMigration = await readFile(new URL('../migrations/0008_billing_dashboard.sql', import.meta.url), 'utf8');
 class D1 {
   constructor() {
     this.queries = 0;
@@ -59,6 +60,7 @@ class D1 {
     this.sql.exec(releaseMigration);
     this.sql.exec(feedbackMigration);
     this.sql.exec(withdrawalMigration);
+    this.sql.exec(billingMigration);
   }
   prepare(query) {
     this.queries++;
@@ -1959,4 +1961,21 @@ test('非公開依頼後は本文を残し、公開同期とGrokの古い本番�
  const old=await releaseRequest(f.e,'requests/'+f.started.id);assert.equal(old.response.status,409);
  const re=await request(f.e,'/api/admin/articles/'+f.id+'/revise','POST',{revision:f.file.revision},true);assert.equal(re.response.status,200);await processAll(f.e);const revision=f.e.DB.sql.prepare('SELECT revision FROM articles WHERE id=?').get(f.id).revision;
  const approved=await request(f.e,'/api/admin/articles/'+f.id+'/review','POST',{revision,status:'published',confirmed:true},true);assert.equal(approved.response.status,409);assert.equal(approved.data.error.code,'article_withdrawn');
+});
+
+ test('請求・Cursor CSV APIは管理者だけに許可し、Originと置き換え確認を検証する', async () => {
+  const e = env();
+  for (const path of ['/api/admin/billing','/api/admin/billing/cursor','/api/admin/billing/sync']) {
+    const options = { method: path.endsWith('/billing') ? 'GET' : 'POST', headers: { 'Cf-Access-Jwt-Assertion': editorToken, Origin: base, 'Content-Type': 'application/json' }, body: path.endsWith('/billing') ? undefined : '{}' };
+    assert.equal((await app.request(base+path, options, e)).status,403);
+  }
+  assert.equal((await app.request(base+'/api/admin/billing',{},e)).status,403);
+  const headers = { 'Cf-Access-Jwt-Assertion': token, Origin: base, 'Content-Type': 'application/json' };
+  assert.equal((await app.request(base+'/api/admin/billing?month=2026-13',{headers},e)).status,400);
+  const body = { csv:'Date,Type,Cost\n2026-10-01T00:00:00Z,Included,0.10', replace_confirmed:true };
+  assert.equal((await app.request(base+'/api/admin/billing/cursor',{method:'POST',headers:{...headers,Origin:'https://evil.test'},body:JSON.stringify(body)},e)).status,403);
+  assert.equal((await app.request(base+'/api/admin/billing/cursor',{method:'POST',headers,body:JSON.stringify({...body,replace_confirmed:false})},e)).status,400);
+  assert.equal((await app.request(base+'/api/admin/billing/cursor',{method:'POST',headers,body:JSON.stringify(body)},e)).status,200);
+  const data=await (await app.request(base+'/api/admin/billing?month=2026-10',{headers},e)).json();
+  assert.equal(data.cursor.groups[0].cost_usd,.1); assert.equal(data.cursor.remaining,null);
 });

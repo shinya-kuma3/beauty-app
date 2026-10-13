@@ -1,3 +1,4 @@
+import { recordApiCall } from './billing.mjs';
 import { settings } from './config.mjs';
 import { now, contentHash } from './core.mjs';
 function duration(value) {
@@ -11,6 +12,7 @@ async function youtube(env, path, params) {
   for (const [key, value] of Object.entries(params))
     url.searchParams.set(key, value);
   url.searchParams.set('key', env.YOUTUBE_API_KEY);
+  await recordApiCall(env, 'youtube', path + '.list');
   const response = await fetch(url, { signal: AbortSignal.timeout(20000) });
   if (!response.ok) throw new Error(`youtube_http_${response.status}`);
   return response.json();

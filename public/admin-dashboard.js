@@ -99,9 +99,9 @@ async function action(task) {
   busy = true;
   document
     .querySelectorAll('input,select,textarea')
-    .forEach((f) => { if (!f.closest('#feedback-tools,#publication-tools,#withdraw-dialog')) f.disabled = true; });
+    .forEach((f) => { if (!f.closest('#feedback-tools,#publication-tools,#withdraw-dialog,#billing-tools')) f.disabled = true; });
   $('message').textContent = '処理しています…';
-  document.querySelectorAll('button').forEach((b) => { if (!b.closest('#feedback-tools,#publication-tools,#withdraw-dialog')) b.disabled = true; });
+  document.querySelectorAll('button').forEach((b) => { if (!b.closest('#feedback-tools,#publication-tools,#withdraw-dialog,#billing-tools')) b.disabled = true; });
   try {
     const message = await task();
     $('message').textContent =
@@ -112,10 +112,10 @@ async function action(task) {
     busy = false;
     document
       .querySelectorAll('input,select,textarea')
-      .forEach((f) => { if (!f.closest('#feedback-tools,#publication-tools,#withdraw-dialog')) f.disabled = false; });
+      .forEach((f) => { if (!f.closest('#feedback-tools,#publication-tools,#withdraw-dialog,#billing-tools')) f.disabled = false; });
     document
       .querySelectorAll('button')
-      .forEach((b) => { if (!b.closest('#feedback-tools,#publication-tools,#withdraw-dialog')) b.disabled = false; });
+      .forEach((b) => { if (!b.closest('#feedback-tools,#publication-tools,#withdraw-dialog,#billing-tools')) b.disabled = false; });
     updateActions();
   }
 }

@@ -1,3 +1,4 @@
+import { billingOverview, importCursor, syncCloudflare } from './billing.mjs';
 import {publications,requestWithdrawal,withdrawalManifest,markWithdrawalBuild} from './withdrawals.mjs';
 import { allowedOrigin, submitFeedback, listFeedback } from './feedback.mjs';
 import {
@@ -233,6 +234,8 @@ for (const path of [
   '/api/admin/feedback/*',
   '/api/admin/editors',
   '/api/admin/editors/*',
+  '/api/admin/billing',
+  '/api/admin/billing/*',
   '/api/admin/operations',
   '/api/admin/jobs/*',
   '/api/admin/youtube/*',
@@ -887,6 +890,17 @@ app.post('/api/admin/jobs/:id/retry', async (c) => {
   if (!result.meta.changes) throw new ApiError(409, 'job_not_failed');
   return c.json({ state: 'queued' });
 });
+app.get('/api/admin/billing', async (c) =>
+  c.json(await billingOverview(c.env, c.req.query('month'))),
+);
+app.post('/api/admin/billing/cursor', async (c) => {
+  const input = parse(
+    z.object({ csv: z.string(), replace_confirmed: z.literal(true) }).strict(),
+    await json(c, 2000000),
+  );
+  return c.json(await importCursor(c.env, input.csv));
+});
+app.post('/api/admin/billing/sync', async (c) => c.json(await syncCloudflare(c.env)));
 app.get('/api/admin/operations', async (c) => {
   const jobs = (
     await c.env.DB.prepare(

@@ -1,3 +1,4 @@
+import { recordApiCall } from './billing.mjs';
 import { z } from "zod";
 import { ApiError, now } from "./core.mjs";
 async function digest(text) {
@@ -89,6 +90,7 @@ export async function submitFeedback(env, input, origin, ip) {
   }
   let check;
   try {
+    await recordApiCall(env, 'turnstile', 'siteverify');
     const response = await fetch(
       "https://challenges.cloudflare.com/turnstile/v0/siteverify",
       {
