@@ -10,11 +10,11 @@
     "乾燥"
   ],
   "status": "published",
-  "updatedAt": "2026-10-07",
+  "updatedAt": "2026-10-14",
   "sections": [
     {
       "heading": "うるおいを支える成分",
-      "body": "グリセリンはグリセロールとも呼ばれます。角層の水分や皮膚のバリアとの関係について研究されている保湿成分です。"
+      "body": "グリセリンはグリセロールとも呼ばれる保湿成分です。クリームやローションなど、日々のケアに使う製品で見かけます。"
     },
     {
       "heading": "使い心地と配合",
@@ -22,22 +22,11 @@
     },
     {
       "heading": "ヘアケアやハンドケアでの使われ方",
-      "body": "グリセリンは保湿成分として、ハンドケアやヘアケアにも使われます。CIR の資料では、ヘアコンディショニング用途も報告されています。使用感は配合や組み合わせによって異なります。"
+      "body": "グリセリンは保湿成分として、ハンドケアやヘアケアにも使われます。使用感は配合や組み合わせによって異なるので、製品全体の使い心地も参考にしましょう。"
     }
   ],
   "caution": "ひとつの配合成分から、すべての肌質への適性を判断することはできません。",
-  "sources": [
-    {
-      "title": "Glycerol and the skin: holistic approach to its origin and functions",
-      "url": "https://pubmed.ncbi.nlm.nih.gov/18510666/",
-      "kind": "research"
-    },
-    {
-      "title": "CIR — Safety Assessment of Glycerin as Used in Cosmetics",
-      "url": "https://www.cir-safety.org/sites/default/files/glycer_122014_FR.pdf",
-      "kind": "official"
-    }
-  ],
+  "sources": [],
   "areas": [
     "skin",
     "body",

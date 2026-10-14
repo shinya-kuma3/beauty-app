@@ -221,7 +221,7 @@ async function generate(env, model, text, video) {
   const system =
     instruction +
     (video
-      ? ' 英語・韓国語などの動画も日本語で要約する。termsに専門用語・成分名のoriginal（原語）,japanese（日本語）,language（言語コード）を残し、不明な語は創作しない。動画のproducts（商品名）,ingredients（成分名）,claims（claimとevidence、根拠が示されていない場合はそう記載）,timestamps（timeとdetail）も記録してください。各配列は重要なものだけ。'
+      ? ' 英語・韓国語などの動画も日本語で要約する。termsに専門用語・成分名のoriginal（原語）,japanese（日本語）,language（言語コード）を残し、不明な語は創作しない。動画のproducts（商品名）,ingredients（成分名）,claims（claimとevidence。evidenceには動画内の説明や体験談の補足を記載。科学的根拠や論文を探す必要はない）,timestamps（timeとdetail）も記録してください。各配列は重要なものだけ。'
       : '');
   // UTF-8 bytes bound text tokens conservatively. Video/audio reservations are deliberately higher than normal usage.
   const reservedInput =

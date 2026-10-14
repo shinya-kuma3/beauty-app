@@ -28,8 +28,8 @@
       "body": "ツボクサエキスや、ツボクサに含まれるマデカッソシド・アシアチコシドなどが関連する名称です。抽出物と個別の成分は同じものではなく、成分の構成や配合量も異なります。「シカ」と書かれていることだけで、配合内容が同じとは判断できません。"
     },
     {
-      "heading": "研究で使われた製品を確かめる",
-      "body": "ツボクサエキスを含むクリームやジェルについて、25人の参加者が4週間、前腕に使用した研究があります。水分量などを測った研究ですが、特定の配合と使用条件の結果です。すべてのシカ製品が同じ働きをすることや、ニキビ・傷を治すことを示すものではありません。"
+      "heading": "シカ製品の選び方",
+      "body": "シカの名前がついたクリームやジェルなど、製品の形や使い心地はさまざまです。成分表示と使い方を見ながら、日々のケアに取り入れやすいものを選びましょう。"
     },
     {
       "heading": "植物由来でも肌との相性を確認する",
@@ -37,28 +37,7 @@
     }
   ],
   "caution": "植物由来だから刺激やアレルギーが起こらないとは限りません。「シカ」や「敏感肌向け」という表現だけで肌に合うと判断せず、製品の使い方と肌の状態を確認してください。傷・湿疹などの治療目的では医療機関へ相談しましょう。",
-  "sources": [
-    {
-      "title": "Centella asiatica in cosmetology",
-      "url": "https://pubmed.ncbi.nlm.nih.gov/24278045/",
-      "kind": "research"
-    },
-    {
-      "title": "Moisturizing and Antiinflammatory Properties of Cosmetic Formulations Containing Centella asiatica Extract",
-      "url": "https://pubmed.ncbi.nlm.nih.gov/27168678/",
-      "kind": "research"
-    },
-    {
-      "title": "CIR — Safety Assessment of Centella asiatica-Derived Ingredients as Used in Cosmetics",
-      "url": "https://pubmed.ncbi.nlm.nih.gov/36812692/",
-      "kind": "official"
-    },
-    {
-      "title": "AAD — How to test skin care products",
-      "url": "https://www.aad.org/public/everyday-care/skin-care-secrets/prevent-skin-problems/test-skin-care-products/",
-      "kind": "guideline"
-    }
-  ],
+  "sources": [],
   "status": "published",
-  "updatedAt": "2026-10-13"
+  "updatedAt": "2026-10-14"
 }

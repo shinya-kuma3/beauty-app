@@ -42,7 +42,7 @@ for (const name of [
   const record = JSON.parse(
     await readFile(`src/content/articles/${name}.json`, 'utf8'),
   );
-  const sourceUrl = record.sources[0].url;
+  const sourceUrl = record.sources[0]?.url || new URL('/articles/' + name + '/', base).href;
   let sourceId;
   try {
     sourceId = (

@@ -1,34 +1,14 @@
-beauty-appの実際の情報収集と記事作成を開始してください。
+beauty-appの美容情報収集と記事作成を行ってください。
+最新の方針はdocs/grok-editorial-policy-prompt.txtに従います。
 
 接続先: https://codex-content-review-pipeline-beauty-app.sinyak4649.workers.dev
-認証: 既に設定したINGEST_API_KEYをBearerで使用。キーを返信・本文・ファイルへ書かない。
+認証: INGEST_API_KEYをBearerで使用。キーを返信や本文に書かない。
 
-【今回の作業】
-1. GET /api/ingest/sources?status=new で素材を取得する。next_offsetがあれば次ページも取得する。
-   テスト記事3件と専用素材は削除済み。米国皮膚科学会（AAD）のフェイスマスク、ドライシャンプー、自宅の角質ケアの海外資料3件を新しい素材として登録済み。
-   これらはCodexの初回整理なので、Grokによる正式チェック済みと扱わない。各source_urlを開いて原文・一次資料・専門用語と照合する。
-2. Xから美容・成分・ケアの投稿を1～2件収集する。
-   投稿URL、作者、投稿日、投稿本文を実際に確認する。一次資料へのリンクも追う。公式発表と広告、体験談と研究結果を分ける。
-   本文が読めない・出典が追えない投稿は根拠として使わず、未取得と報告する。検索結果から本文やURLを作り上げない。
-   POST /api/ingest/sources に type=x,source_url,author,title,raw_summary,language を登録。raw_summaryには日本語の独自要約、原文の専門用語、根拠URL、PRと信頼性の確認状況を入れる。
-3. 海外の美容Web記事・研究も確認する。登録済みAAD資料を優先し、必要なら公開された原著論文や海外の皮膚科学会・公的機関の資料を追加する。
-   新規資料は同じ素材APIへtype=researchで登録する。一般解説と原著論文を混同しない。
-4. YouTubeは通常動画・Shortsを含む@EGA.channelが対象。動画発見と日本語の構造化要約はサイト側のYouTube Data API・Geminiが担当する。
-   GETでtype=youtubeの素材が返れば、raw_summaryの要点・商品・成分・主張と根拠・タイムスタンプ・原語表記を確認する。
-   未要約の動画はAPI一覧にまだ出ない。題名・サムネイルだけで動画の内容を推測して記事にしない。見当たらなければ要約待ちと報告する。
-5. 原文と素材を照合して日本語の記事を作り、今回の初回分は最大5記事をpending_reviewとして提出する。テーマが重なる素材はまとめてもよい。
-   /articles/の既存公開記事と同じ内容ばかりにならないよう確認する。原文を転載せず、要点を再構成し、成分名は必要に応じて日本語と原語を併記する。
-   X・動画の個人の主張やPRを効能の科学的根拠として扱わない。未確認事項はai_check_notesに明記する。
-6. POST /api/ingest/articles に次のフィールドを送る（statusは送らない。サーバーがpending_reviewで登録する）。
-   slug: 重複しない英小文字・数字・ハイフン
-   title / body_markdown / excerpt: 日本語の独自記事
-   category: skin / hair / nail / body のいずれか
-   tags: 最大5個。仮指定または空配列。正式な提案は埋め込み処理で作る。
-   source_ids: 使用した素材のUUID配列（必須）
-   citations: 確認した出典のHTTPS URL配列（必須）
-   ai_check_notes: 原文・一次情報・研究条件・PR・効能の断定・未確認事項を点検したメモ（必須）
-   API登録成功後にだけ PATCH /api/ingest/sources/素材ID に {"status":"used"} を送る。
-7. 取得したX投稿URL、海外資料URL、使用したYouTube動画URL、作成記事のタイトル・ID、未取得・未確認事項を報告する。
-
-公開・承認・管理画面操作・記事削除・GitHubへのpushは行わない。素材登録・チェック・日本語の記事化までを担当する。
-以後の再チェックAPIと本番差分確認APIは、これまで渡した指示どおり継続する。
+1. GET /api/ingest/sources?status=newで素材を取得。next_offsetがあれば次ページも取得する。
+2. Xの美容の話題・商品紹介・使い心地・体験談を集める。投稿を読めたものを独自に要約し、POST /api/ingest/sourcesへtype=xで登録する。作者・URL・タイトル・日本語要約・言語を記録する。
+3. 海外の美容Web記事・レビューも扱える。既存DBとの互換性のためtype=researchで登録するが、研究・論文を収集する義務はない。科学資料のリンクは記事に掲載しない。
+4. @EGA.channelは通常動画・Shortsとも対象。サイト側のGemini要約がtype=youtubeとして返る。商品・成分・紹介内容・体験談の補足・タイムスタンプ・原語を参考にする。
+5. 投稿や動画を参考に日本語の独自記事を作る。トレンド・使い方・体験談を扱ってよい。論文や科学的根拠の有無を理由に題材を制限しない。見ていない内容や元にない体験は創作せず、PRの場合はわかるように書く。
+6. POST /api/ingest/articlesへslug,title,body_markdown,excerpt,category（skin/hair/nail/body）,tags（最大5）,source_idsを送る。citationsには参考にしたX・YouTube等のHTTPS URLを任意で入れる。科学的なリンクは入れない。ai_check_notesは任意の編集メモ。statusは送らず、サーバーがpending_reviewで登録する。
+7. 記事登録が成功してから使用した素材をPATCH /api/ingest/sources/:idでusedにする。
+8. 作成した記事と未取得の素材を報告する。公開・削除・管理画面操作・GitHub更新は行わない。

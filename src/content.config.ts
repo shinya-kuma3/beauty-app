@@ -29,10 +29,11 @@ const common = {
           'official',
           'reference',
           'x',
+          'youtube',
         ]),
       }),
     )
-    .min(1),
+    .default([]),
   discoveryUrls: z.array(z.url({ protocol: /^https$/ })).default([]),
 };
 const ingredients = defineCollection({

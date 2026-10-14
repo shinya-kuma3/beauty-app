@@ -20,7 +20,7 @@
   "sections": [
     {
       "heading": "レチノイドとは？",
-      "body": "レチノイドは、ビタミンAに関連する成分の総称です。米国皮膚科学会（AAD）は、スキンケア製品で使われるものと、医療で処方されるものを分けて紹介しています。このページでは、肌に塗る製品に関係するレチノール・レチナール・レチノイン酸を整理します。"
+      "body": "レチノイドは、ビタミンAに関連する成分の総称です。スキンケア製品で使われるものと、医療で処方されるものがあります。このページでは、肌に塗る製品に関係するレチノール・レチナール・レチノイン酸を整理します。"
     },
     {
       "heading": "レチノール（Retinol）",
@@ -40,32 +40,11 @@
     },
     {
       "heading": "使用時に確認すること",
-      "body": "レチノイドを含む製品は、乾燥・赤み・皮むけ・刺激を生じることがあります。使用量や頻度は製品の説明、医薬品では医師の指示を守ってください。AADは保湿と日焼け対策も勧めています。AHA・BHAなどの角質ケアや、ほかの治療薬を同じ部位で使う場合は、使用前に組み合わせを確認しましょう。"
+      "body": "レチノイドを含む製品は、乾燥・赤み・皮むけ・刺激を生じることがあります。使用量や頻度は製品の説明、医薬品では医師の指示を守ってください。保湿と日焼け対策も合わせて考えましょう。AHA・BHAなどの角質ケアや、ほかの治療薬を同じ部位で使う場合は、使用前に組み合わせを確認しましょう。"
     }
   ],
   "caution": "妊娠中はレチノイドの使用を避けてください。妊娠の予定がある場合や授乳中は、使用前に医師へ相談してください。強い刺激や赤みが出た場合は使用を中止し、医療機関へ相談しましょう。トレチノインなどの医薬品は、自己判断で使用量や頻度を増やさないでください。",
-  "sources": [
-    {
-      "title": "AAD — Retinoid or retinol?",
-      "url": "https://www.aad.org/public/everyday-care/skin-care-secrets/anti-aging/retinoid-retinol",
-      "kind": "guideline"
-    },
-    {
-      "title": "DermNet — Topical retinoids (vitamin a creams)",
-      "url": "https://dermnetnz.org/topics/topical-retinoids",
-      "kind": "guideline"
-    },
-    {
-      "title": "Unoccluded retinol penetrates human skin in vivo more effectively than unoccluded retinyl palmitate or retinoic acid",
-      "url": "https://pubmed.ncbi.nlm.nih.gov/9284094/",
-      "kind": "research"
-    },
-    {
-      "title": "MedlinePlus — Tretinoin Topical",
-      "url": "https://medlineplus.gov/druginfo/meds/a682437.html",
-      "kind": "official"
-    }
-  ],
+  "sources": [],
   "status": "published",
-  "updatedAt": "2026-10-13"
+  "updatedAt": "2026-10-14"
 }

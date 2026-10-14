@@ -1,7 +1,7 @@
 {
   "title": "PDRN（ポリデオキシリボヌクレオチド）",
   "englishName": "Polydeoxyribonucleotide (PDRN)",
-  "summary": "DNA由来の断片を含む原料として研究されるPDRN。由来や製剤、使い方によって条件が異なるため、細胞・動物・医療の研究と、塗る化粧品の情報を分けて確認します。",
+  "summary": "美容液やクリームの名前で見かけるPDRN。原料の由来や使い方を知り、自分のケアに合う製品選びのヒントに。",
   "category": "skin",
   "areas": [
     "skin"
@@ -12,21 +12,20 @@
     "ポリデオキシリボヌクレオチド",
     "Polydeoxyribonucleotide",
     "DNA",
-    "スキンケア",
-    "研究"
+    "スキンケア"
   ],
   "sections": [
     {
       "heading": "PDRNとは？",
-      "body": "PDRNはポリデオキシリボヌクレオチドの略称で、DNA由来の断片を含む原料を指します。サケなど魚類から抽出した原料が報告されていますが、由来・精製方法・DNA断片の大きさは原料や製品ごとに確認する必要があります。"
+      "body": "PDRNはポリデオキシリボヌクレオチドの略称で、DNA由来の断片を含む原料を指します。原料の由来や配合は製品によって異なります。"
     },
     {
-      "heading": "研究の対象と使い方を確かめる",
-      "body": "PDRNには皮膚の細胞を使った研究があります。また、PDRN・ビタミンC・ナイアシンアミドの混合液をマイクロニードルで届けた動物モデルの研究もあります。これらの結果は、普通の美容液を肌に塗る条件と同じではありません。"
+      "heading": "美容液やクリームの選び方",
+      "body": "成分名だけで選ばず、製品の形、テクスチャー、香りなど、自分が使いやすいかも見てみましょう。ほかの配合成分や製品の使い方も選ぶときのヒントです。"
     },
     {
-      "heading": "成分名だけで効果を決めない",
-      "body": "PDRNが入っているという情報だけで、市販品の働きや肌との相性は判断できません。研究で使われた製剤・配合・対象・使用方法を確認しましょう。「肌を再生する」「必ず改善する」などの宣伝は、根拠と実際の製品条件を分けて読むことが大切です。"
+      "heading": "自分のケアに合う使い方を",
+      "body": "同じPDRNの名前があっても、使い心地は製品によって異なります。普段のケアにどう取り入れるかを考え、製品表示に沿って使いましょう。"
     },
     {
       "heading": "製品の由来と使用方法を見る",
@@ -34,28 +33,7 @@
     }
   ],
   "caution": "PDRNという名前だけで、製品の安全性や治療効果が保証されるわけではありません。刺激・赤み・かゆみが出た場合は使用を中止してください。医療目的の使用や施術は医師へ相談しましょう。",
-  "sources": [
-    {
-      "title": "Recent advances on polydeoxyribonucleotide extraction and its novel application in cosmeceuticals",
-      "url": "https://pubmed.ncbi.nlm.nih.gov/39486723/",
-      "kind": "research"
-    },
-    {
-      "title": "Polydeoxyribonucleotide exerts opposing effects on ERK activity in human skin keratinocytes and fibroblasts",
-      "url": "https://pubmed.ncbi.nlm.nih.gov/37350391/",
-      "kind": "research"
-    },
-    {
-      "title": "A Mixture of Topical Forms of Polydeoxyribonucleotide, Vitamin C, and Niacinamide… (2022)",
-      "url": "https://pubmed.ncbi.nlm.nih.gov/35209068/",
-      "kind": "research"
-    },
-    {
-      "title": "AAD — How to test skin care products",
-      "url": "https://www.aad.org/public/everyday-care/skin-care-secrets/prevent-skin-problems/test-skin-care-products/",
-      "kind": "guideline"
-    }
-  ],
+  "sources": [],
   "status": "published",
-  "updatedAt": "2026-10-13"
+  "updatedAt": "2026-10-14"
 }

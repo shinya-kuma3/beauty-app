@@ -5,7 +5,7 @@
 1. 編集者が管理画面で確認・保存・公開承認します。未承認の記事は対象外です。
 2. GitHub Actions「Approved article publication」が15分ごと（混雑時は遅延あり）または手動で実行されます。承認済み記事を `src/content/approved-articles/*.json` としてdevelopへcommitします。
 3. Actionsが管理Workerへ、本番mainの旧記事と新しい承認記事の差分確認を依頼します。
-4. Grok Botが `/api/ingest/releases` から依頼を取得し、本文・素材・出典と照合して結果を返します。
+4. Grok Botが `/api/ingest/releases` から依頼を取得し、人が承認した記事とGitの固定記事を照合して結果を返します。科学的根拠による再審査は行いません。
 5. 全記事がmatch、verdictがpass、警告なしの結果だけを許可します。不明・相違・警告・古い内容の結果は止めます。
 6. Actionsが本番mainのコードを使って型チェック、テスト、静的ビルド、生成本文と出典の照合、メンズのビルドを行います。
 7. 内容のハッシュとブランチの版を再確認し、記事JSONだけをmainへcommit・pushします。GitHubの更新はforce=falseです。コード・Workflow・設定などは自動取り込みしません。

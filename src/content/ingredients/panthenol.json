@@ -1,7 +1,7 @@
 {
   "title": "パンテノール",
   "englishName": "Panthenol",
-  "summary": "保湿や肌を整える目的で使われる成分。デクスパンテノールを用いた皮膚の研究があります。",
+  "summary": "肌の保湿や、髪を整えるケアの製品で見かける成分。成分表示と製品全体の使い心地を見て選びましょう。",
   "category": "skin",
   "role": "保湿・整肌",
   "tags": [
@@ -10,34 +10,23 @@
     "パンテノール"
   ],
   "status": "published",
-  "updatedAt": "2026-10-08",
+  "updatedAt": "2026-10-14",
   "sections": [
     {
-      "heading": "研究されていること",
-      "body": "デクスパンテノールを配合した製剤について、角層の水分や皮膚のバリア機能を調べた研究があります。"
+      "heading": "パンテノールの使われ方",
+      "body": "パンテノールは、保湿や肌を整えるケアの成分として使われます。成分表示ではパンテノールの名前を探してみましょう。"
     },
     {
-      "heading": "研究と化粧品の違い",
-      "body": "特定の製剤で得られた研究結果を、同じ名前の成分が入るすべての化粧品へそのまま当てはめることはできません。研究の条件まで確認することが大切です。"
+      "heading": "使い心地を見ながら選ぶ",
+      "body": "化粧品の使い心地は、ほかの成分との組み合わせや製品の形によって変わります。成分名だけで決めず、日々のケアに使いやすいかを見てみましょう。"
     },
     {
       "heading": "髪を整える製品にも",
-      "body": "パンテノールはヘアコンディショニング成分としての用途も報告されています。髪の手触りや使用感は製品全体の配合で変わり、髪を修復できると一律に判断することはできません。"
+      "body": "パンテノールは、髪を整えるヘアケア製品にも使われます。手触りや使用感は製品全体の配合で変わるため、自分の髪に合う使い心地を選びましょう。"
     }
   ],
   "caution": "化粧品でのケアと、医薬品による治療は分けて考えてください。",
-  "sources": [
-    {
-      "title": "Effect of topically applied dexpanthenol on epidermal barrier function and stratum corneum hydration",
-      "url": "https://pubmed.ncbi.nlm.nih.gov/10965426/",
-      "kind": "research"
-    },
-    {
-      "title": "Safety Assessment of Panthenol, Pantothenic Acid, and Derivatives as Used in Cosmetics",
-      "url": "https://pubmed.ncbi.nlm.nih.gov/36177798/",
-      "kind": "official"
-    }
-  ],
+  "sources": [],
   "areas": [
     "skin",
     "hair"

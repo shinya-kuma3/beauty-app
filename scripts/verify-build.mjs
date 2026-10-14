@@ -1,3 +1,4 @@
+import {publicReferences} from '../shared/editorial-policy.mjs';
 import {parseVisibility} from '../shared/withdrawal-content.mjs';
 import { readFile, access, readdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
@@ -62,7 +63,7 @@ for (const result of allMatches()) {
 }
 // Exercise the scripts against the actual generated public page.
 const { Window } = await import('happy-dom');
-const { renderMarkdown } = await import('../worker/core.mjs');
+const { renderPublicMarkdown } = await import('../worker/core.mjs');
 const { parseSnapshot, digest } =
   await import('../shared/release-content.mjs');
 for (const folder of ['approved-articles', 'generated-articles']) {
@@ -103,7 +104,7 @@ for (const folder of ['approved-articles', 'generated-articles']) {
         snapshot.title,
       );
       const expected = detail.document.createElement('div');
-      expected.innerHTML = renderMarkdown(snapshot.bodyMarkdown);
+      expected.innerHTML = renderPublicMarkdown(snapshot.bodyMarkdown);
       assert.equal(
         detail.document
           .querySelector('.markdown-body')
@@ -112,7 +113,7 @@ for (const folder of ['approved-articles', 'generated-articles']) {
         expected.textContent.replace(/\s+/g, ' ').trim(),
         'Rendered article differs from approved Markdown',
       );
-      for (const source of snapshot.sources)
+      for (const source of publicReferences(snapshot.sources))
         assert.ok(
           [...detail.document.querySelectorAll('a')].some(
             (a) => a.getAttribute('href') === source.url,

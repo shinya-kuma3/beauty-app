@@ -13,8 +13,8 @@ export const exportedArticle = z
     tags: z.array(z.string().min(1).max(30)).max(5),
     citations: z
       .array(z.url().refine((v) => new URL(v).protocol === 'https:'))
-      .min(1)
-      .max(20),
+      .max(20)
+      .default([]),
     updated_at: z.iso.datetime(),
     published_at: z.iso.datetime(),
     revision: z.number().int().positive(),
@@ -67,7 +67,7 @@ export const staticArticleSchema = z
           })
           .strict(),
       )
-      .min(1),
+      .default([]),
     readingMinutes: z.number().int().min(1).max(60),
     relatedIngredients: z.array(z.string()),
     bodyMarkdown: z.string().min(40).max(50000),

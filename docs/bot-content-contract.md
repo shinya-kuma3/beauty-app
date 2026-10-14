@@ -1,74 +1,23 @@
-# Grok bot の更新契約
+# 美容コンテンツの更新契約
 
-## 予定する流れ
+最新の編集方針は[editorial-policy.md](editorial-policy.md)を参照してください。科学的根拠や論文は掲載条件ではありません。参考にしたX・YouTubeのリンクは残し、科学資料へのリンクは掲載しません。
 
-X で美容成分やケアの話題を見つける → 元の公式資料・研究を確認する → JSON ファイルを追加・更新する → GitHub の PR またはコミット → CI 検証 → マージ・ホスティング側のビルドで反映。
+現在のBotは[管理Worker API](grok-bot-integration.md)へ素材とpending_reviewの記事を提出します。管理者・編集者が公開承認し、Git同期と差分チェックを経て静的ページになります。BotにGitHubの書き込みや公開権限は不要です。
 
-このアプリ側はファイルを読むところから担当します。X / Grok の API、bot の実行環境、GitHub の認証は後から接続します。
+## 静的JSONの構成
 
-## bot が触るファイル
+- 成分: src/content/ingredients/<id>.json
+- 初期記事: src/content/articles/<id>.json
+- 管理画面で承認された記事: src/content/approved-articles/<id>.json
 
-- 成分: `src/content/ingredients/<id>.json`
-- 記事: `src/content/articles/<id>.json`
+title、summary、category（skin/hair/nail/body）、tags、status（draft/published）、updatedAt、sectionsを持ちます。成分はenglishName・role・caution、記事はreadingMinutes・relatedIngredientsも使います。sourcesは任意の参考リンク配列で、空配列を許可します。Xだけ・YouTubeだけで公開でき、別の資料を要求しません。
 
-既存 ID を維持すると既存の URL を維持できます。重複作成を避け、ID の変更・削除はリンクの移行と一緒に扱ってください。UI、スキーマ、設定、依存関係は情報更新の対象に含めない運用を推奨します。
+sourcesのkindはx、youtube、reference、officialを使えます。旧guideline/researchは互換性のため読み込めますが、科学資料は公開ページに表示しません。URLはHTTPSです。discoveryUrlsは任意の収集元URLです。
 
-## 共通データ
+## 公開と検証
 
-| フィールド | 意味 |
-| --- | --- |
-| title | 日本語の成分名・記事タイトル（120字以内） |
-| summary | 一覧や検索に使う説明（300字以内） |
-| category | 主カテゴリ: `skin` / `hair` / `nail` / `body` |
-| areas | 任意。複数カテゴリで使う成分の対象配列。主カテゴリも含める |
-| tags | 検索キーワードの配列（1〜8件） |
-| status | `draft` / `published`（未指定は下書き） |
-| updatedAt | 実在する `YYYY-MM-DD` の更新日 |
-| sections | `{ heading, body }` の配列。プレーンテキスト。改行は `\n` |
-| sources | `{ title, url, kind }` の配列。URL は HTTPS |
-| discoveryUrls | 任意。話題を見つけた X 投稿等の HTTPS URL 配列 |
+未承認の記事は公開しません。編集者は内容・表記・紹介の仕方を確認します。研究条件・一次研究・科学的根拠の確認は必須ではありません。紹介元にない体験や情報は創作しないでください。
 
-sources の kind は `guideline`（専門団体）、`research`（研究）、`official`（公式資料）、`x`（投稿）。公開するデータには少なくともひとつ、X 以外の参考資料が必要です。収集元の X 投稿は discoveryUrls に保存できます。discoveryUrls は来歴の保管用で、通常の詳細ページには表示しません。
+npm run validate:contentはデータ形式と参照、npm run checkは型、npm run buildは静的ページ、npm run test:buildは公開ページと検索・リンクを確認します。これらは科学的裏付けを判定する検査ではありません。
 
-## 成分だけのフィールド
-
-`englishName`（英語名）、`role`（役割）、`caution`（選ぶ際の補足）が必要です。
-
-```json
-{
-  "title": "調査中の成分",
-  "englishName": "Ingredient Name",
-  "summary": "資料を確認してから、ここに説明を記載します。",
-  "category": "skin",
-  "role": "調査中",
-  "tags": ["美容成分"],
-  "status": "draft",
-  "updatedAt": "2026-10-07",
-  "sections": [{ "heading": "調査メモ", "body": "原資料と研究条件の確認待ち。" }],
-  "caution": "情報確認中。",
-  "sources": [{ "title": "実際の資料名へ置き換える", "url": "https://example.com/source", "kind": "official" }],
-  "discoveryUrls": []
-}
-```
-
-これは形式の例です。URL・タイトル・更新日は実際の調査内容に置き換えてください。
-
-## 記事だけのフィールド
-
-`readingMinutes`（1〜60の整数）、任意の `relatedIngredients`（成分ファイルの ID 配列）。公開記事から参照する成分も公開済みである必要があります。
-
-## 公開前の確認
-
-新規情報は `draft` で追加して、出典・研究条件・表現を確認できる設計です。自動で `published` にするか、確認後に公開するかは bot の運用時に決めてください。X の反響や投稿文そのものを、効果の根拠として扱わないようにします。研究の対象、配合、結果の範囲を保ち、製品全体の効果へ広げて断定しないでください。
-
-`npm run validate:content` で形式・参照を検査します。`npm run check` と `npm run build` でスキーマと画面生成を検査し、`npm run test:build` で公開データが一覧・詳細・検索へ反映されていることを確認します。CI は根拠の正しさ自体を判定するものではありません。
-
-## 未決定の接続項目
-
-GitHub リポジトリは `git@github.com:shinya-kuma3/beauty-app.git`。公開先は Cloudflare Pages、本体は `my-beauty-palette.com`、メンズは `mens.my-beauty-palette.com` を予定しています。Cloudflare アカウント・DNS の接続、X の情報取得方法、Grok bot の実行場所、取得頻度、公開前の確認方法は未設定です。API キーや GitHub トークンをコンテンツファイルへ保存しないでください。
-
-## 成分診断との関係
-
-成分診断は `src/lib/finder.mjs` の部位・状態・目標と編集済みのおすすめ理由から、2〜3成分を表示します。結果は36通りの静的ページです。乱数や医療的な判定は使いません。候補の順序は状態と目標の両方から決まり、各成分の役割・出典は共通の成分詳細で管理します。
-
-新しい JSON 成分を追加しても、診断の候補には自動追加されません。診断の候補を変える際は、対象部位・根拠・理由も確認してから `finder.mjs` を編集してください。公開済み候補を削除・下書き化すると、テストとビルドが失敗するため、診断側の参照も一緒に変更します。
+成分診断の候補はsrc/lib/finder.mjsで管理します。対象部位・おすすめ理由・公開中の参照先を確認して変更します。成分を追加するだけでは診断候補へ自動追加しません。

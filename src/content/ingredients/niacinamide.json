@@ -10,30 +10,19 @@
     "ビタミンB3"
   ],
   "status": "published",
-  "updatedAt": "2026-10-07",
+  "updatedAt": "2026-10-14",
   "sections": [
     {
       "heading": "どんな成分？",
-      "body": "ナイアシンアミドは、ニコチンアミドとも呼ばれるビタミンB3の一種です。肌に塗布する製剤について、配合や使用条件を含めた研究が行われています。"
+      "body": "ナイアシンアミドは、ニコチンアミドとも呼ばれるビタミンB3の一種です。スキンケア製品の成分表示で見かける名前です。"
     },
     {
-      "heading": "研究を読むときの視点",
-      "body": "研究で使われた濃度や製剤、対象者、期間によって結果は異なります。研究があることと、すべての市販製品が同じ働きを持つことは別に考えましょう。"
+      "heading": "いつものケアに取り入れるなら",
+      "body": "同じ成分名が入っていても、製品の形や配合、使い心地はさまざまです。美容液やクリームなど、自分が使いやすい製品を選び、表示された使い方に合わせて取り入れましょう。"
     }
   ],
   "caution": "高い濃度ほど自分に合うとは限りません。使用方法は製品の表示を確認してください。",
-  "sources": [
-    {
-      "title": "Niacinamide: a review on dermal delivery strategies and clinical evidence (2024)",
-      "url": "https://pubmed.ncbi.nlm.nih.gov/38722460/",
-      "kind": "research"
-    },
-    {
-      "title": "Final report of the safety assessment of niacinamide and niacin",
-      "url": "https://pubmed.ncbi.nlm.nih.gov/16596767/",
-      "kind": "research"
-    }
-  ],
+  "sources": [],
   "areas": [
     "skin"
   ]

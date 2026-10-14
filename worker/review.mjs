@@ -46,7 +46,7 @@ export async function reviewInput(_env, row, sources) {
   };
   return {
     content_hash: await hash(
-      JSON.stringify(['external-grok-v1', snapshot]),
+      JSON.stringify(['external-grok-beauty-v2', snapshot]),
     ),
     input_text: JSON.stringify(snapshot),
     body_chars: row.body_markdown.length,
@@ -56,7 +56,7 @@ export async function reviewInput(_env, row, sources) {
 export const grokResultSchema = reviewSchema
   .extend({
     revision: z.number().int().positive(),
-    ai_check_notes: z.string().trim().min(1).max(10000),
+    ai_check_notes: z.string().trim().max(10000).default(''),
     checked_citations: z
       .array(
         z
@@ -67,9 +67,9 @@ export const grokResultSchema = reviewSchema
             return u.protocol === 'https:' && !u.username && !u.password;
           }),
       )
-      .min(1)
-      .max(20),
-    primary_source_notes: z.string().trim().min(1).max(500),
+      .max(20)
+      .default([]),
+    primary_source_notes: z.string().trim().max(500).default(''),
     pr_notes: z.string().trim().min(1).max(500),
     terms: z
       .array(

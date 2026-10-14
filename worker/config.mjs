@@ -8,7 +8,6 @@ export const tags = [
   ['sensitive', '敏感肌', '刺激を感じやすい肌、やさしいケア、肌への配慮'],
   ['dry', '乾燥肌', '乾燥、つっぱり、保湿、肌のうるおい'],
   ['oily', '脂性肌', '皮脂、べたつき、テカリ、脂性肌のケア'],
-  ['research', '研究', '論文、研究結果、調査、検証方法の紹介'],
   ['new-product', '新商品', '新発売の化粧品、美容製品、商品情報'],
 ].map(([id, label, description]) => ({ id, label, description }));
 const number = (env, key, fallback, min, max) => {

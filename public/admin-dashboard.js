@@ -41,8 +41,6 @@ const messages = {
     '別の人またはAIによる更新が入りました。入力内容は残しています。必要な修正を控えてから「一覧を更新」で最新版を確認してください。',
   ai_processing_incomplete:
     '要約・タグの処理が終わってから公開できます。',
-  independent_citation_required:
-    'X・YouTube以外の参考資料も追加して確認してください。',
   rejected_source: '却下された素材が含まれています。',
   invalid_input: '入力内容を確認してください。',
   rate_limited:
@@ -292,7 +290,7 @@ function renderCheck(check) {
   );
   $('check-result').append(scope, el('p', check.result.overview));
   for (const [label, value] of [
-    ['一次情報の確認', check.result.primary_source_notes],
+    ['参考情報の補足', check.result.primary_source_notes],
     ['PR・利益相反', check.result.pr_notes],
   ])
     if (value) $('check-result').append(el('h3', label), el('p', value));
@@ -314,7 +312,7 @@ function renderCheck(check) {
 
   const categories = {
     claim: '断定表現',
-    evidence: '根拠',
+    evidence: '参考情報',
     wording: '表記',
     consistency: '整合性',
   };
@@ -322,7 +320,7 @@ function renderCheck(check) {
     $('check-result').append(
       el(
         'p',
-        'AIによる指摘はありませんでした。原文と根拠の確認は引き続き必要です。',
+        'AIによる指摘はありませんでした。記事全体の読みやすさや紹介内容を確認してください。',
       ),
     );
   for (const f of check.result.findings) {
@@ -415,7 +413,7 @@ async function openArticle(id) {
   $('sources').replaceChildren();
   for (const source of data.sources) {
     const d = el('details'),
-      link = el('a', '素材の出典を開く');
+      link = el('a', '参考にした投稿・動画を開く');
     link.href = source.source_url;
     link.target = '_blank';
     link.rel = 'noopener noreferrer';

@@ -23,7 +23,7 @@ export default defineConfig({
 
       const prefix=base.replace(/\/$/,'');
       const path = `${prefix}/mens`;
-      await writeFile(new URL('_redirects', dir), `${path} ${prefix}/ 301\n${path}/ ${prefix}/ 301\n${prefix}/articles/mens-care-basics ${prefix}/articles/ 301\n${prefix}/articles/mens-care-basics/ ${prefix}/articles/ 301\n`);
+      await writeFile(new URL('_redirects', dir), `${path} ${prefix}/ 301\n${path}/ ${prefix}/ 301\n${prefix}/articles/mens-care-basics ${prefix}/articles/ 301\n${prefix}/articles/mens-care-basics/ ${prefix}/articles/ 301\n${prefix}/articles/reading-ingredient-information ${prefix}/articles/ 301\n${prefix}/articles/reading-ingredient-information/ ${prefix}/articles/ 301\n`);
     } },
   }],
 });

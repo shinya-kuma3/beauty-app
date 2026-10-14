@@ -6,15 +6,15 @@
 
 | 担当 | 処理 |
 | --- | --- |
-| Grok Bot（外部） | X・海外の文章の収集、原文・一次情報・PR・効能の断定の確認、日本語の記事化、管理画面からの再チェック |
+| Grok Bot（外部） | X・海外の文章の収集、紹介内容・表記・読みやすさ・PR表示の確認、日本語の記事化、管理画面からの再チェック |
 | Gemini（gemini-3.1-flash-lite） | 海外を含むYouTube動画を日本語で構造化要約、記事の200文字以内の短い要約 |
 | Workers AI（@cf/baai/bge-m3） | 日本語対応の埋め込み、コサイン類似度による最大5タグ、保存した埋め込みによる類似記事検索 |
-| 管理者・編集者 | 原文と結果の最終確認、編集、公開・却下 |
+| 管理者・編集者 | 内容と結果の最終確認、編集、公開・却下 |
 
 Workers AIで文章を生成する経路は削除しました。Geminiが429を返したときは翌日へ延期します。
 古い SUMMARY_PROVIDER / FALLBACK_MODEL / REVIEW_INPUT_CHARS / REVIEW_MAX_TOKENS の設定は使用しません。
 EMBEDDING_MODEL はBGE-M3のみ対応です。違うモデル名は設定エラーになり、生成モデルを呼びません。
-研究・Xの文章素材はGrok Botが担当し、サイト内では埋め込みタグだけを処理します。
+海外Web・Xの文章素材はGrok Botが担当し、サイト内では埋め込みタグだけを処理します。
 YouTubeは通常動画・Shortsを含む @EGA.channel 全体を対象とする初期設定を維持しています。
 英語・韓国語なども1回のGemini呼び出しで日本語要約にし、terms に原語・日本語・言語コードを保存します。
 新規動画の結果に terms を追加しました。過去の保存済み要約を無条件に再生成しません。
@@ -22,11 +22,11 @@ YouTubeは通常動画・Shortsを含む @EGA.channel 全体を対象とする�
 ## 初期の記事化に使う既存API
 
 - GET /api/ingest/sources?status=new：素材と日本語のYouTube要約を取得
-- POST /api/ingest/sources：X・研究・海外記事の素材を登録
+- POST /api/ingest/sources：X・海外美容記事の素材を登録
 - PATCH /api/ingest/sources/:id：used / rejected に更新
-- POST /api/ingest/articles：出典 citations と信頼性メモ ai_check_notes を添えて pending_review で登録
+- POST /api/ingest/articles：任意の参考リンク citations と編集メモ ai_check_notes を添えて pending_review で登録
 
-Grok Botは専門用語について日本語と原語を併記した本文を作ります。動画の terms を確認し、元資料と照合してください。
+Grok Botは必要に応じて成分名の日本語と原語を併記します。動画の terms を確認し、元資料と照合してください。
 AIによるチェックは原文を見た事実や医学的な安全性をサイト側で保証するものではありません。確認できない資料は不明と明記します。
 
 ## 管理画面からの再チェック（追加API）
@@ -83,18 +83,18 @@ Content-Type: application/json
 ~~~json
 {
   "revision": 2,
-  "ai_check_notes": "一次資料を確認しました。研究条件と効能表現は編集者の確認が必要です。",
-  "overview": "効能の断定を避け、原文の条件を併記してください。",
-  "findings": [{"severity":"warning","category":"claim","quote":"必ず改善します","reason":"効能の断定です。","suggestion":"研究の範囲と個人差がわかる表現へ修正してください。"}],
-  "questions": ["原文の研究条件は記事の対象者に当てはまりますか？"],
+  "ai_check_notes": "投稿の紹介内容と表記を確認しました。",
+  "overview": "効能の断定を避け、紹介内容をわかりやすくしてください。",
+  "findings": [{"severity":"warning","category":"claim","quote":"必ず改善します","reason":"効能の断定です。","suggestion":"使い心地の個人差がわかる表現へ修正してください。"}],
+  "questions": ["商品名や使い方は投稿の紹介内容と一致していますか？"],
   "checked_citations": ["https://example.org/paper"],
-  "primary_source_notes": "原論文と研究条件を照合しました。",
+  "primary_source_notes": "参考投稿の内容を確認しました。",
   "pr_notes": "広告・PR・利益相反の記載を確認しました。",
   "terms": [{"original":"ceramide","japanese":"セラミド","language":"en"}]
 }
 ~~~
 
-確認メモ、一次情報の確認メモ、PRの確認メモ、確認した出典URLは必須です。
+overview・findings・questions・pr_notes・termsは返信の形式として必要です。ai_check_notes・checked_citations・primary_source_notesは任意です。科学的根拠や一次研究の確認は掲載条件ではありません。
 checked_citations は依頼された記事のcitationsにあるURLをそのまま返します。
 findingsは最大6、questions最大3、terms最大20。categoryはclaim / evidence / wording / consistencyです。
 同じ返信の再送はキャッシュ済みとして成功します。完了した依頼への異なる返信は409で拒否します。

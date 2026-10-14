@@ -376,7 +376,7 @@ test('Botは公開・管理画面にアクセスできず、認証が必要', as
     400,
   );
 });
-test('出典・確認メモは必須、URL重複と不正な入力を拒否', async () => {
+test('参考リンク・編集メモは任意、URL重複と不正な入力を拒否', async () => {
   const e = env(),
     s = await request(e, '/api/ingest/sources', 'POST', source);
   assert.equal(
@@ -395,16 +395,17 @@ test('出典・確認メモは必須、URL重複と不正な入力を拒否', as
         citations: [],
       })
     ).response.status,
-    400,
+    201,
   );
   assert.equal(
     (
       await request(e, '/api/ingest/articles', 'POST', {
         ...article(s.data.id),
+        slug: 'optional-editor-notes',
         ai_check_notes: '',
       })
     ).response.status,
-    400,
+    201,
   );
   assert.equal(
     (
@@ -1978,4 +1979,23 @@ test('非公開依頼後は本文を残し、公開同期とGrokの古い本番�
   assert.equal((await app.request(base+'/api/admin/billing/cursor',{method:'POST',headers,body:JSON.stringify(body)},e)).status,200);
   const data=await (await app.request(base+'/api/admin/billing?month=2026-10',{headers},e)).json();
   assert.equal(data.cursor.groups[0].cost_usd,.1); assert.equal(data.cursor.remaining,null);
+});
+
+test('X・YouTubeだけでも参考リンクなしでも、人の承認後に公開できる',async()=>{
+ const e=env(),s=await request(e,'/api/ingest/sources','POST',{...source,type:'x',source_url:'https://x.com/example/status/123'});
+ for(const [i,citations] of [[],['https://x.com/example/status/123'],['https://www.youtube.com/watch?v=example']].entries()){
+  const input={...article(s.data.id),slug:'beauty-reference-'+i,citations};delete input.ai_check_notes;
+  const a=await request(e,'/api/ingest/articles','POST',input);assert.equal(a.response.status,201);assert.doesNotMatch(e.DB.sql.prepare('SELECT ai_check_notes FROM articles WHERE id=?').get(a.data.id).ai_check_notes,/科学的根拠|論文/);await processAll(e);
+  const row=e.DB.sql.prepare('SELECT revision,ai_check_notes FROM articles WHERE id=?').get(a.data.id);assert.doesNotMatch(row.ai_check_notes,/論文|科学的根拠|原文を確認/);
+  const reviewed=await request(e,'/api/admin/articles/'+a.data.id+'/review','POST',{status:'published',revision:row.revision,confirmed:true},true);assert.equal(reviewed.response.status,200);
+ }
+});
+
+test('Grokチェックは論文確認メモと参考URLを省略して返信できる',async()=>{
+ const e=env(),id=await submitted(e),queued=await checkRequest(e,id);
+ const list=(await request(e,'/api/ingest/checks?status=pending')).data;
+ assert.match(list.requests[0].instructions,/掲載条件ではなく/);
+ const result=await request(e,'/api/ingest/checks/'+queued.id+'/result','POST',{revision:list.requests[0].revision,overview:'読みやすさと表記を確認しました。',findings:[],questions:[],pr_notes:'紹介元のPR表示は未確認です。',terms:[]});
+ assert.equal(result.response.status,200);
+ const row=e.DB.sql.prepare('SELECT status FROM articles WHERE id=?').get(id);assert.equal(row.status,'pending_review');
 });

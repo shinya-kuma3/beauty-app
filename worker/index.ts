@@ -806,22 +806,6 @@ app.post('/api/admin/articles/:id/review', async (c) => {
   if (body.status === 'published' && row.ai_status !== 'complete')
     throw new ApiError(409, 'ai_processing_incomplete');
   if (body.status === 'published') {
-    const cited = JSON.parse(row.citations);
-    if (
-      !cited.some(
-        (u: string) =>
-          ![
-            'x.com',
-            'www.x.com',
-            'twitter.com',
-            'www.twitter.com',
-            'youtube.com',
-            'www.youtube.com',
-            'youtu.be',
-          ].includes(new URL(u).hostname),
-      )
-    )
-      throw new ApiError(400, 'independent_citation_required');
     const rejected = await c.env.DB.prepare(
       "SELECT s.id FROM sources s JOIN article_sources r ON r.source_id=s.id WHERE r.article_id=? AND s.status='rejected' LIMIT 1",
     )

@@ -1,3 +1,4 @@
+import { isScientificReference } from '../shared/editorial-policy.mjs';
 import { z } from 'zod';
 import MarkdownIt from 'markdown-it';
 export class ApiError extends Error {
@@ -74,8 +75,8 @@ export const articleInput = z
     category: z.enum(['skin', 'hair', 'nail', 'body']),
     tags: z.array(text(30)).max(5).default([]),
     source_ids: z.array(z.uuid()).min(1).max(20),
-    citations: z.array(https).min(1).max(20),
-    ai_check_notes: text(10000),
+    citations: z.array(https).max(20).default([]),
+    ai_check_notes: z.string().trim().max(10000).default(''),
   })
   .strict();
 export const editInput = articleInput
@@ -179,7 +180,7 @@ export function reviewFlags(row) {
     )
   )
     flags.push('医療・効果の断定に見える表現を確認してください。');
-  flags.push('出典が各主張を支えるか、管理者が原文を確認してください。');
+  flags.push('美容の話題や体験談として、読みやすさ・表記・紹介内容を確認してください。');
   return flags;
 }
 const md = new MarkdownIt({
@@ -196,6 +197,19 @@ md.validateLink = (link) => {
   }
 };
 export const renderMarkdown = (body) => md.render(body);
+export function renderPublicMarkdown(body) {
+  const tokens = md.parse(body, {});
+  for (const block of tokens) {
+    const stack = [];
+    for (const token of block.children || []) {
+      if (token.type === 'link_open') {
+        const hide = isScientificReference({ url: token.attrGet('href') });
+        stack.push(hide); token.hidden = hide;
+      } else if (token.type === 'link_close') token.hidden = stack.pop() || false;
+    }
+  }
+  return md.renderer.render(tokens, md.options, {});
+}
 export function decode(row) {
   if (!row) return null;
   const out = { ...row };

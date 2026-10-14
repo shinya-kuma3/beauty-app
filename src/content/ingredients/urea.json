@@ -17,7 +17,7 @@
   "sections": [
     {
       "heading": "乾燥ケアの候補",
-      "body": "米国皮膚科学会（AAD）は、強い乾燥に対する保湿製品に用いられる成分のひとつとして尿素を挙げています。ケアに適した濃度や組み合わせは、肌の状態によって異なります。"
+      "body": "尿素は、乾燥ケアの保湿製品に使われる成分のひとつです。濃度や組み合わせは製品によって異なるので、成分名だけでなく使用部位や使い方も見てみましょう。"
     },
     {
       "heading": "製品の説明から選ぶ",
@@ -25,13 +25,7 @@
     }
   ],
   "caution": "ひび割れ・傷・炎症がある部位では刺激を感じることがあります。強い乾燥やかゆみは、自己判断で濃度を上げず医療機関へ相談してください。",
-  "sources": [
-    {
-      "title": "AAD — Dry skin: Diagnosis and treatment",
-      "url": "https://www.aad.org/public/diseases/a-z/dry-skin-treatment",
-      "kind": "guideline"
-    }
-  ],
+  "sources": [],
   "status": "published",
-  "updatedAt": "2026-10-08"
+  "updatedAt": "2026-10-14"
 }

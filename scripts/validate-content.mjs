@@ -31,12 +31,11 @@ export function validateRecords(records) {
     if (!Number.isFinite(date.getTime()) || date.toISOString().slice(0, 10) !== data.updatedAt) fail('updatedAt は実在する YYYY-MM-DD の日付にしてください');
     if (!Array.isArray(data.tags) || !data.tags.length || !data.tags.every((tag) => typeof tag === 'string' && tag.trim())) fail('tags に検索用の文字列を指定してください');
     if (!Array.isArray(data.sections) || !data.sections.length || !data.sections.every((s) => typeof s.heading === 'string' && s.heading.trim() && typeof s.body === 'string' && s.body.trim())) fail('sections に見出しと本文が必要です');
-    if (!Array.isArray(data.sources) || !data.sources.length) fail('出典が必要です');
-    for (const source of data.sources || []) {
+    if (data.sources !== undefined && !Array.isArray(data.sources)) fail('参考リンクは配列にしてください');
+    for (const source of Array.isArray(data.sources) ? data.sources : []) {
       try { if (new URL(source.url).protocol !== 'https:') fail('出典 URL は HTTPS にしてください'); } catch { fail('出典 URL が不正です'); }
-      if (!source.title || !['guideline', 'research', 'official', 'x'].includes(source.kind)) fail('出典の title / kind を確認してください');
+      if (!source.title || !['guideline', 'research', 'official', 'reference', 'x', 'youtube'].includes(source.kind)) fail('出典の title / kind を確認してください');
     }
-    if (data.status === 'published' && !(data.sources || []).some((s) => ['guideline', 'research', 'official'].includes(s.kind))) fail('公開する情報には X 以外の参考資料が必要です');
     for (const url of data.discoveryUrls || []) { try { if (new URL(url).protocol !== 'https:') fail('discoveryUrls は HTTPS にしてください'); } catch { fail('discoveryUrls が不正です'); } }
     if (collection === 'ingredients') for (const field of ['englishName', 'role', 'caution']) if (typeof data[field] !== 'string' || !data[field].trim()) fail(`${field} が必要です`);
     if (collection === 'articles') {
