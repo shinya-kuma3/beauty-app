@@ -32,7 +32,8 @@ async function settle() {
   for (let i = 0; i < 10; i++)
     await new Promise((resolve) => setImmediate(resolve));
 }
-async function setup(role = 'editor', members = []) {
+async function setup(role = 'editor', members = [], articles = [row]) {
+  const checks = new Map();
   const window = new Window({
     url: 'https://example.test/admin',
     settings: {
@@ -68,16 +69,14 @@ async function setup(role = 'editor', members = []) {
       });
     if (path.startsWith('articles?'))
       return Response.json({
-        articles: [row],
+        articles,
         next_cursor: null,
         total: 1,
       });
-    if (
-      path === 'articles/test-article' &&
-      (options.method || 'GET') === 'GET'
-    )
+    const selected = articles.find(article => path === 'articles/' + article.id);
+    if (selected && (options.method || 'GET') === 'GET')
       return Response.json({
-        article: row,
+        article: selected,
         preview_html: '<p>保存済みの本文です。</p>',
         sources: [],
         events: [
@@ -91,7 +90,7 @@ async function setup(role = 'editor', members = []) {
         versions: [],
         publication: null,
         review_flags: ['原文を確認してください。'],
-        check: null,
+        check: checks.get(selected.id) || null,
       });
     if (path === 'preview')
       return Response.json({ preview_html: '<p>未保存の本文</p>' });
@@ -112,8 +111,10 @@ async function setup(role = 'editor', members = []) {
         { error: { code: 'revision_conflict' } },
         { status: 409 },
       );
-    if (path.endsWith('ai-check'))
-      return Response.json({ state: 'queued' });
+    if (path.endsWith('ai-check')) {
+      const id=path.split('/')[1];checks.set(id,{id:'check-'+id,state:'pending',revision:2,stale:false,requested_by:'editor@example.test',created_at:row.updated_at,result:null});
+      return Response.json({ id:'check-'+id,state: 'pending' });
+    }
     if (path.endsWith('ai-run'))
       return Response.json({ jobs: [{ state: 'complete' }] });
     return Response.json({});
@@ -124,6 +125,7 @@ async function setup(role = 'editor', members = []) {
   return {
     window,
     calls,
+    setCheck: (id,check) => checks.set(id,check),
     setConflict: (v) => (conflict = v),
     setBlock: (v) => (block = v),
     $: (id) => window.document.getElementById(id),
@@ -406,4 +408,23 @@ test('続きを表示するとき未適用のフォーム変更を混ぜず、AP
 
 test('記事一覧を更新しても意見箱の前へ・次への無効状態を解除しない',async()=>{
  const s=await setup('admin');try{s.window.eval(await readFile(new URL('../public/admin-feedback.js',import.meta.url),'utf8'));await settle();assert.equal(s.$('feedback-prev').disabled,true);assert.equal(s.$('feedback-next').disabled,true);s.$('refresh').click();await settle();assert.equal(s.$('feedback-prev').disabled,true);assert.equal(s.$('feedback-next').disabled,true);}finally{await s.window.happyDOM.close();}
+});
+
+
+test('再チェックは選択した1記事だけを依頼し、その記事だけ緑表示・専用依頼文にする',async()=>{
+ const second={...row,id:'second-article',title:'ヘアケアの記事'};
+ const s=await setup('editor',[],[row,second]);
+ try {
+  const buttons=()=>[...s.$('articles').querySelectorAll('.article-item')];
+  buttons()[1].click();await settle();s.$('ai-check').click();await settle();
+  assert.deepEqual(s.calls.filter(call=>call.path.endsWith('/ai-check')).map(call=>call.path),['articles/second-article/ai-check']);
+  assert.equal(buttons()[0].classList.contains('rechecking'),false);assert.equal(buttons()[1].classList.contains('rechecking'),true);assert.match(buttons()[1].textContent,/Grok再チェック中/);
+  const instruction=s.$('check-result').querySelector('pre').textContent;assert.match(instruction,/checks\/check-second-article/);assert.match(instruction,/この記事だけ/);assert.doesNotMatch(instruction,/test-article|limit=5/);
+  s.setCheck(second.id,{id:'check-second-article',state:'complete',revision:2,stale:false,requested_by:'editor@example.test',created_at:row.updated_at,result:null});
+  buttons()[1].click();await settle();assert.equal(buttons()[1].classList.contains('rechecking'),false);assert.equal(buttons()[1].querySelector('.recheck-status'),null);
+ }finally{await s.window.happyDOM.close();}
+});
+test('一覧の再取得でも依頼中の色を復元し、古い版や完了の状態を緑にしない',async()=>{
+ const s=await setup('editor',[],[{...row,recheck_pending:1},{...row,id:'other',recheck_pending:0}]);
+ try {const items=[...s.$('articles').querySelectorAll('.article-item')];assert.equal(items[0].classList.contains('rechecking'),true);assert.equal(items[1].classList.contains('rechecking'),false);s.setCheck(row.id,{state:'pending',stale:true});items[0].click();await settle();assert.equal(items[0].classList.contains('rechecking'),false);}finally{await s.window.happyDOM.close();}
 });

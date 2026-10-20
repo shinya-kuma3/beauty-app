@@ -358,7 +358,7 @@ export async function articleList(env, params) {
     direction = p.sort === 'newest' ? 'DESC' : 'ASC';
   const rows = (
     await env.DB.prepare(
-      'SELECT a.id,a.slug,a.title,a.status,a.ai_status,a.updated_at,a.created_at,a.published_at,a.revision,a.category,a.tags FROM articles a WHERE ' +
+      'SELECT a.id,a.slug,a.title,a.status,a.ai_status,a.updated_at,a.created_at,a.published_at,a.revision,a.category,a.tags,EXISTS(SELECT 1 FROM article_checks c WHERE c.article_id=a.id AND c.provider=\'grok\' AND c.state=\'pending\' AND c.revision=a.revision AND a.status=\'pending_review\') AS recheck_pending FROM articles a WHERE ' +
         p.pageWhere +
         ' ORDER BY a.' +
         p.field +

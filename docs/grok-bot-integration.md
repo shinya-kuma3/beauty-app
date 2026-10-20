@@ -43,7 +43,7 @@ https://codex-content-review-pipeline-beauty-app.sinyak4649.workers.dev
 
 ### 依頼の取得
 
-GET /api/ingest/checks?status=pending&limit=5
+GET /api/ingest/checks?status=pending&limit=1
 
 Authorization: Bearer INGEST_API_KEY
 
@@ -71,7 +71,7 @@ Authorization: Bearer INGEST_API_KEY
 本文・素材は切り詰めずに返します。取得では担当者メールや管理履歴を返しません。
 revision は返信までそのまま持ち、本文・出典・素材が変わった依頼は破棄してください。
 一覧取得後に編集が入ると、返信は409 check_obsoleteで拒否されます。
-1回のlimitは1〜10、既定5です。大量の依頼は繰り返し取得して処理してください。
+1回の返却は最大1記事、既定limit=1です。互換性のためlimit=2〜10も受け付けますが返す依頼は1件までです。各依頼を個別に返信してから、次を取得します。複数の依頼を一括の審査文脈にまとめないでください。
 
 ### 結果の返却
 
@@ -108,7 +108,7 @@ findingsは最大6、questions最大3、terms最大20。categoryはclaim / evide
 
 ~~~sh
 export BEAUTY_API_URL="https://codex-content-review-pipeline-beauty-app.sinyak4649.workers.dev"
-curl --fail-with-body "$BEAUTY_API_URL/api/ingest/checks?status=pending&limit=5" \
+curl --fail-with-body "$BEAUTY_API_URL/api/ingest/checks?status=pending&limit=1" \
   -H "Authorization: Bearer $INGEST_API_KEY"
 
 curl --fail-with-body "$BEAUTY_API_URL/api/ingest/checks/REQUEST_ID/result" \
@@ -137,3 +137,11 @@ GET /api/admin/articles/:id/related は最新の保存済み埋め込みを比�
 本番は1日1回の収集と、毎時の順次AI処理の既存Cronを使います。ENABLE_SCHEDULED=trueは本番公開時に設定します。
 Grok Botの再チェックはCronのAI処理ではなく、外部Botの定期取得で進みます。
 1日30回・600000予約トークンの上限、内容ハッシュ、タグ辞書と要約のキャッシュを維持しています。
+
+## 1記事だけを指定して再チェックする
+
+GET /api/ingest/checks/REQUEST_ID は {request: {...}} を返します。GET /api/ingest/checks?status=pending&article_id=ARTICLE_ID はその記事だけをrequests配列で返します。認証は従来のBearerキーです。対象がなければ個別IDは404、記事IDの絞り込みは空配列で、全体一覧へ切り替わることはありません。
+
+各依頼はscope=single_article、request_endpoint、result_endpointを持ちます。article_id・revision・本文・紐づく素材だけを読み、同じ依頼のresult_endpointへ返してください。記事一覧や本番差分チェックの全記事を再取得して再チェックに混ぜないでください。
+
+管理画面は対象タイトルと「この記事だけの依頼文をコピー」を表示します。対話型Botに1記事だけ依頼する場合は、その依頼文を渡してください。再チェック待ちの記事は一覧で緑色と「Grok再チェック中」を表示します。完了・古い版・公開済み記事は対象外です。

@@ -642,10 +642,18 @@ app.post('/api/admin/articles/:id/ai-check', async (c) => {
 app.get('/api/ingest/checks', async (c) => {
   if (c.req.query('status') && c.req.query('status') !== 'pending')
     throw new ApiError(400, 'invalid_status');
-  const limit = Number(c.req.query('limit') ?? 5);
+  const limit = Number(c.req.query('limit') ?? 1);
   if (!Number.isInteger(limit) || limit < 1 || limit > 10)
     throw new ApiError(400, 'invalid_input');
-  return c.json(await pendingChecks(c.env, limit));
+  const articleId = c.req.query('article_id');
+  if (articleId !== undefined && !/^[a-zA-Z0-9_-]{1,120}$/.test(articleId))
+    throw new ApiError(400, 'invalid_input');
+  return c.json(await pendingChecks(c.env, limit, { article_id: articleId }));
+});
+app.get('/api/ingest/checks/:id', async (c) => {
+  const data = await pendingChecks(c.env, 1, { id: c.req.param('id') });
+  if (!data.requests.length) throw new ApiError(404, 'check_not_found');
+  return c.json({ request: data.requests[0] });
 });
 app.post('/api/ingest/checks/:id/result', async (c) =>
   c.json(await completeCheck(c.env, c.req.param('id'), await json(c))),

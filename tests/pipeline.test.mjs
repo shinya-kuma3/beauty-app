@@ -2010,3 +2010,31 @@ test('監視APIは管理者専用で、収集キーと異なるOriginを拒否�
 test('内部エラーをHTTP 5xx件数に記録し、生の例外を返さない',async()=>{
  const e=env();e.DB.sql.exec('DROP TABLE sources');const result=await request(e,'/api/ingest/sources');assert.equal(result.response.status,500);assert.equal(result.data.error.code,'internal_error');assert.equal((await request(e,'/api/admin/health','GET',undefined,true)).data.local_http_errors,1);
 });
+
+
+test('個別Grok再チェックは依頼IDと記事IDで絞り、ほかの記事の依頼や結果を変更しない',async()=>{
+ const e=env();
+ const ids=[];for(const suffix of ['one','two']){const sourceResult=await request(e,'/api/ingest/sources','POST',{...source,source_url:'https://example.org/individual-'+suffix});const response=await request(e,'/api/ingest/articles','POST',{...article(sourceResult.data.id),slug:'individual-'+suffix,title:'記事 '+suffix});assert.equal(response.response.status,201);ids.push(response.data.id);}
+ const [first,second]=ids;const a=await checkRequest(e,first),b=await checkRequest(e,second);
+ const list=(await request(e,'/api/ingest/checks?status=pending&limit=10')).data;assert.equal(list.requests.length,1);assert.equal(list.max_per_poll,1);
+ const filtered=(await request(e,'/api/ingest/checks?article_id='+second)).data;assert.deepEqual(filtered.requests.map(r=>r.article_id),[second]);
+ const single=(await request(e,'/api/ingest/checks/'+b.id)).data.request;assert.equal(single.article_id,second);assert.equal(single.article.title,'記事 two');assert.equal(single.scope,'single_article');assert.equal(single.result_endpoint,'/api/ingest/checks/'+b.id+'/result');assert.match(single.instructions,/1記事だけ/);assert.equal(single.article.requested_by,undefined);
+ assert.equal((await request(e,'/api/ingest/checks?article_id=missing')).data.requests.length,0);assert.equal((await request(e,'/api/ingest/checks?article_id=')).response.status,400);
+ const before=(await request(e,'/api/admin/articles?status=pending_review','GET',null,true)).data.articles;assert.deepEqual(before.filter(r=>r.recheck_pending).map(r=>r.id).sort(),[first,second].sort());
+ const original=e.DB.sql.prepare('SELECT ai_check_notes,revision FROM articles WHERE id=?').get(first);
+ assert.equal((await request(e,'/api/ingest/checks/'+b.id+'/result','POST',grokResult(single.revision))).response.status,200);
+ assert.deepEqual(e.DB.sql.prepare('SELECT ai_check_notes,revision FROM articles WHERE id=?').get(first),original);assert.equal(e.DB.sql.prepare('SELECT state FROM article_checks WHERE id=?').get(a.id).state,'pending');
+ const after=(await request(e,'/api/admin/articles?status=pending_review','GET',null,true)).data.articles;assert.deepEqual(after.filter(r=>r.recheck_pending).map(r=>r.id),[first]);
+ assert.equal((await request(e,'/api/ingest/checks/'+b.id)).response.status,404);
+ assert.equal((await app.request(base+'/api/ingest/checks/'+a.id,{},e)).status,401);
+});
+
+
+test('先頭の素材が古くても次の有効な1記事を返し、個別取得では別の記事の依頼を変更しない',async()=>{
+ const e=env(),ids=[],sources=[];
+ for(const suffix of ['stale','valid']){const sourceResult=await request(e,'/api/ingest/sources','POST',{...source,source_url:'https://example.org/recheck-'+suffix});sources.push(sourceResult.data.id);const response=await request(e,'/api/ingest/articles','POST',{...article(sourceResult.data.id),slug:'recheck-'+suffix});ids.push(response.data.id);}
+ const old=await checkRequest(e,ids[0]),valid=await checkRequest(e,ids[1]);
+ e.DB.sql.prepare('UPDATE article_checks SET created_at=? WHERE id=?').run('2026-01-01T00:00:00Z',old.id);e.DB.sql.prepare('UPDATE sources SET raw_summary=? WHERE id=?').run('更新された素材',sources[0]);
+ assert.equal((await request(e,'/api/ingest/checks/'+valid.id)).data.request.article_id,ids[1]);assert.equal(e.DB.sql.prepare('SELECT state FROM article_checks WHERE id=?').get(old.id).state,'pending');
+ const data=(await request(e,'/api/ingest/checks?limit=1')).data;assert.deepEqual(data.requests.map(r=>r.article_id),[ids[1]]);assert.equal(e.DB.sql.prepare('SELECT state FROM article_checks WHERE id=?').get(old.id).state,'obsolete');
+});

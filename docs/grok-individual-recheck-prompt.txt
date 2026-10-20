@@ -1,0 +1,11 @@
+beauty-appの管理画面からのGrok再チェックを、1記事ずつ処理する方式に更新してください。
+
+・管理画面で渡された GET /api/ingest/checks/REQUEST_ID があれば、その依頼だけを取得し、request.articleだけを確認する。
+・定期取得は GET /api/ingest/checks?status=pending&limit=1 を使う。返却はrequests配列で最大1件。1件の返信が終わってから次を取得し、複数の記事をまとめて審査しない。
+・記事を指定する場合は GET /api/ingest/checks?status=pending&article_id=ARTICLE_ID を使う。対象が0件なら処理を終える。全体の取得へ切り替えない。
+・article_id、revision、content_hashはその依頼のものを使い、request.articleの本文と紐づく素材だけを確認する。
+・公開記事一覧、ほかの下書き、本番差分チェックの一覧を取得して「再チェック」に混ぜない。
+・結果は指定のresult_endpoint（POST /api/ingest/checks/REQUEST_ID/result）だけに返す。別の依頼IDを使わない。409/404の依頼は終了し、編集者の最新版へ古い結果を流用しない。
+・認証は既存のINGEST_API_KEYを使用し、キーを返答やログに含めない。
+・読みやすさ・表記・紹介内容・素材との相違・PR表示を確認する。科学的根拠や論文を掲載条件にしない。参考にしたX・YouTubeのリンクは残す。
+・公開・削除・本文編集や、新しい記事の作成は、この「再チェック」では行わない。記事収集や本番差分確認の依頼とは別に扱う。

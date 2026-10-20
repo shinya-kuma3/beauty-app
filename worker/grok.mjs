@@ -93,27 +93,28 @@ export async function requestCheck(env, id, revision, actor) {
   if (!after) throw new ApiError(409, 'revision_conflict');
   return after;
 }
-export async function pendingChecks(env, limit = 5) {
+export async function pendingChecks(env, limit = 1, filter = {}) {
+  // Inspect a small candidate window to skip stale inputs, but return only one job.
+  const checkId = filter.id ?? null;
+  const articleId = filter.article_id ?? null;
   await env.DB.prepare(
-    "UPDATE article_checks SET state='obsolete' WHERE provider='grok' AND state='pending' AND NOT EXISTS(SELECT 1 FROM articles a WHERE a.id=article_id AND a.status='pending_review' AND a.revision=article_checks.revision)",
-  ).run();
+    "UPDATE article_checks SET state='obsolete' WHERE provider='grok' AND state='pending' AND NOT EXISTS(SELECT 1 FROM articles a WHERE a.id=article_id AND a.status='pending_review' AND a.revision=article_checks.revision) AND (? IS NULL OR id=?) AND (? IS NULL OR article_id=?)",
+  )
+    .bind(checkId, checkId, articleId, articleId)
+    .run();
   const rows = (
     await env.DB.prepare(
-      "SELECT c.* FROM article_checks c WHERE provider='grok' AND state='pending' ORDER BY created_at,id LIMIT ?",
+      "SELECT c.* FROM article_checks c WHERE provider='grok' AND state='pending' AND (? IS NULL OR c.id=?) AND (? IS NULL OR c.article_id=?) ORDER BY created_at,id LIMIT ?",
     )
-      .bind(limit)
+      .bind(checkId, checkId, articleId, articleId, checkId ? 1 : 10)
       .all()
   ).results;
   const requests = [];
   for (const check of rows) {
-    const row = await env.DB.prepare('SELECT * FROM articles WHERE id=?')
+    const row = await env.DB.prepare("SELECT * FROM articles WHERE id=?")
       .bind(check.article_id)
       .first();
-    const input = await reviewInput(
-      env,
-      row,
-      await sourcesFor(env.DB, row.id),
-    );
+    const input = await reviewInput(env, row, await sourcesFor(env.DB, row.id));
     if (input.content_hash !== check.content_hash) {
       await env.DB.prepare(
         "UPDATE article_checks SET state='obsolete' WHERE id=? AND state='pending'",
@@ -127,12 +128,16 @@ export async function pendingChecks(env, limit = 5) {
       article_id: check.article_id,
       revision: check.revision,
       content_hash: check.content_hash,
+      scope: "single_article",
+      request_endpoint: "/api/ingest/checks/" + check.id,
+      result_endpoint: "/api/ingest/checks/" + check.id + "/result",
       article: JSON.parse(check.input_text),
       instructions:
-        '美容の話題、使い方、商品紹介、体験談を扱う記事として、読みやすさ・表記・素材との意味の相違・PR表示を確認してください。論文や科学的根拠の提示・裏付けは掲載条件ではなく、それらがないことを指摘や公開停止の理由にしないでください。参考にしたX・YouTubeのURLは残し、論文・科学的根拠へのリンクは記事に含めないでください。元資料にない事実や体験は創作しないでください。日本語の確認メモと指摘を返し、専門用語には原語を残してください。記事の公開・削除・本文編集はできません。',
+        "この依頼のarticle_idとrevisionで指定した1記事だけを確認してください。他の記事や依頼をまとめて確認せず、全記事一覧の取得・再審査は行わないでください。結果はこの依頼のresult_endpointだけに返してください。美容の話題、使い方、商品紹介、体験談を扱う記事として、読みやすさ・表記・素材との意味の相違・PR表示を確認してください。論文や科学的根拠の提示・裏付けは掲載条件ではなく、それらがないことを指摘や公開停止の理由にしないでください。参考にしたX・YouTubeのURLは残し、論文・科学的根拠へのリンクは記事に含めないでください。元資料にない事実や体験は創作しないでください。日本語の確認メモと指摘を返し、専門用語には原語を残してください。記事の公開・削除・本文編集はできません。",
     });
+    break;
   }
-  return { requests };
+  return { requests, scope: "single_article", max_per_poll: 1 };
 }
 export async function completeCheck(env, id, body) {
   const data = parse(grokResultSchema, body),

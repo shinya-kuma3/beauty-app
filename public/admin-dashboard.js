@@ -97,9 +97,9 @@ async function action(task) {
   busy = true;
   document
     .querySelectorAll('input,select,textarea')
-    .forEach((f) => { if (!f.closest('#feedback-tools,#publication-tools,#withdraw-dialog,#billing-tools')) f.disabled = true; });
+    .forEach((f) => { if (!f.closest('#feedback-tools,#publication-tools,#withdraw-dialog,#billing-tools,#health-tools')) f.disabled = true; });
   $('message').textContent = '処理しています…';
-  document.querySelectorAll('button').forEach((b) => { if (!b.closest('#feedback-tools,#publication-tools,#withdraw-dialog,#billing-tools')) b.disabled = true; });
+  document.querySelectorAll('button').forEach((b) => { if (!b.closest('#feedback-tools,#publication-tools,#withdraw-dialog,#billing-tools,#health-tools')) b.disabled = true; });
   try {
     const message = await task();
     $('message').textContent =
@@ -110,10 +110,10 @@ async function action(task) {
     busy = false;
     document
       .querySelectorAll('input,select,textarea')
-      .forEach((f) => { if (!f.closest('#feedback-tools,#publication-tools,#withdraw-dialog,#billing-tools')) f.disabled = false; });
+      .forEach((f) => { if (!f.closest('#feedback-tools,#publication-tools,#withdraw-dialog,#billing-tools,#health-tools')) f.disabled = false; });
     document
       .querySelectorAll('button')
-      .forEach((b) => { if (!b.closest('#feedback-tools,#publication-tools,#withdraw-dialog,#billing-tools')) b.disabled = false; });
+      .forEach((b) => { if (!b.closest('#feedback-tools,#publication-tools,#withdraw-dialog,#billing-tools,#health-tools')) b.disabled = false; });
     updateActions();
   }
 }
@@ -230,6 +230,7 @@ async function list(append = false, filters = appliedFilters) {
       action(() => openArticle(row.id));
     };
     $('articles').append(b);
+    setRecheckState(row.id, !!row.recheck_pending);
   }
   nextCursor = data.next_cursor ?? null;
   if (!append) total = data.total ?? listed.length;
@@ -245,8 +246,19 @@ async function list(append = false, filters = appliedFilters) {
   $('article-count').textContent =
     total + '件中 ' + listed.length + '件表示';
 }
+function setRecheckState(id, pending) {
+  const row = listed.find(row => row.id === id);
+  if (row) row.recheck_pending = pending;
+  const button = [...$('articles').querySelectorAll('.article-item')].find(button => button.dataset.id === id);
+  if (!button) return;
+  button.classList.toggle('rechecking', !!pending);
+  const old = button.querySelector('.recheck-status');
+  if (pending && !old) button.append(el('span', 'Grok再チェック中', 'recheck-status'));
+  if (!pending && old) old.remove();
+}
 function renderCheck(check) {
   $('check-result').replaceChildren();
+  if (current) setRecheckState(current.id, !!check && check.state === 'pending' && !check.stale);
   if (!check) {
     $('check-state').textContent =
       'Grok Botの再チェック依頼はまだありません。現在の信頼性メモは編集欄で確認できます。';
@@ -269,6 +281,21 @@ function renderCheck(check) {
       'hint',
     ),
   );
+  if (check.state === 'pending' && !check.stale && current) {
+    const target = current;
+    const requestUrl = location.origin + '/api/ingest/checks/' + check.id;
+    const note = el('div', undefined, 'notice single-recheck');
+    note.append(el('strong', '対象は「' + target.title + '」の1記事だけです。'), el('p', 'Botはこの依頼URLから対象記事だけを取得します。複数の記事をまとめた再チェックではありません。'));
+    const instruction = 'この記事だけを再チェックしてください。\n記事：' + target.title + '\n記事ID：' + target.id + '\nGET ' + requestUrl + '\n既存のINGEST_API_KEYで認証してください。キーは返信に含めず、返されたrequest.articleだけを確認し、同じ依頼のresult_endpointへ結果を返してください。他の記事の取得や一括再チェックは行わないでください。';
+    const copy = el('button', 'この記事だけの依頼文をコピー', 'secondary');
+    copy.type = 'button';
+    copy.onclick = async () => {
+      try { await navigator.clipboard.writeText(instruction); copy.textContent = 'コピーしました'; }
+      catch { copy.textContent = '下の依頼文を選択してコピーしてください'; }
+    };
+    const details = el('details'); details.append(el('summary', 'Botに渡す依頼文'), el('pre', instruction));
+    note.append(copy, details); $('check-result').append(note);
+  }
   if (!check.result) return;
   const scope = el('div', undefined, 'notice');
   scope.append(
@@ -739,15 +766,16 @@ function jobMessage(result) {
 $('ai-check').onclick = () =>
   action(async () => {
     if (dirty) throw new Error('修正を保存してから依頼してください。');
+    const { id, revision } = current;
     const result = await api(
-      'articles/' + current.id + '/ai-check',
+      'articles/' + encodeURIComponent(id) + '/ai-check',
       'POST',
-      { revision: current.revision },
+      { revision },
     );
-    await openArticle(current.id);
+    await openArticle(id);
     return result.cached
       ? '同じ内容のGrok Botの結果を再利用しました。'
-      : 'Grok Botへの依頼を登録しました。BotがAPIから取得し、返信すると結果が表示されます。';
+      : 'Grok Botへの依頼を、この1記事だけで登録しました。Botが取得・返信すると結果が表示されます。';
   });
 $('related').onclick = () =>
   action(async () => {
