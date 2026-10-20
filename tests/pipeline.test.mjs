@@ -49,6 +49,7 @@ const releaseMigration = await readFile(
 const feedbackMigration=await readFile(new URL('../migrations/0006_feedback.sql',import.meta.url),'utf8');
 const withdrawalMigration=await readFile(new URL('../migrations/0007_article_withdrawals.sql',import.meta.url),'utf8');
 const billingMigration = await readFile(new URL('../migrations/0008_billing_dashboard.sql', import.meta.url), 'utf8');
+const proposalMigration=await readFile(new URL('../migrations/0009_article_proposals.sql',import.meta.url),'utf8');
 class D1 {
   constructor() {
     this.queries = 0;
@@ -61,6 +62,7 @@ class D1 {
     this.sql.exec(feedbackMigration);
     this.sql.exec(withdrawalMigration);
     this.sql.exec(billingMigration);
+    this.sql.exec(proposalMigration);
   }
   prepare(query) {
     this.queries++;
@@ -2037,4 +2039,71 @@ test('先頭の素材が古くても次の有効な1記事を返し、個別取�
  e.DB.sql.prepare('UPDATE article_checks SET created_at=? WHERE id=?').run('2026-01-01T00:00:00Z',old.id);e.DB.sql.prepare('UPDATE sources SET raw_summary=? WHERE id=?').run('更新された素材',sources[0]);
  assert.equal((await request(e,'/api/ingest/checks/'+valid.id)).data.request.article_id,ids[1]);assert.equal(e.DB.sql.prepare('SELECT state FROM article_checks WHERE id=?').get(old.id).state,'pending');
  const data=(await request(e,'/api/ingest/checks?limit=1')).data;assert.deepEqual(data.requests.map(r=>r.article_id),[ids[1]]);assert.equal(e.DB.sql.prepare('SELECT state FROM article_checks WHERE id=?').get(old.id).state,'obsolete');
+});
+
+
+test('Grokの本文修正案は人が採用するまで保持され、採用後も未公開で履歴に残る',async()=>{
+ const e=env(),id=await submitted(e),queued=await checkRequest(e,id);
+ const original=e.DB.sql.prepare('SELECT body_markdown FROM articles WHERE id=?').get(id).body_markdown;
+ const proposed=original+'\n\n## 使い心地を振り返る\n季節や製品表示も確認しながら、無理のない範囲で取り入れてみましょう。';
+ const payload={...grokResult(1),proposed_body_markdown:proposed};
+ assert.equal((await request(e,'/api/ingest/checks/'+queued.id+'/result','POST',payload)).response.status,200);
+ const detail=(await request(e,'/api/admin/articles/'+id,'GET',null,true)).data;
+ assert.equal(detail.article.body_markdown,original);assert.equal(detail.check.original_body_markdown,original);assert.equal(detail.check.result.proposed_body_markdown,proposed);
+ const path='/api/admin/articles/'+id+'/checks/'+queued.id+'/decision';
+ assert.equal((await request(e,path,'POST',{revision:2,decision:'accepted'})).response.status,403);
+ assert.equal((await request(e,path,'POST',{revision:2,decision:'accepted'},true)).response.status,200);
+ const after=(await request(e,'/api/admin/articles/'+id,'GET',null,true)).data;
+ assert.equal(after.article.body_markdown,proposed);assert.equal(after.article.status,'pending_review');assert.equal(after.article.ai_status,'queued');
+ assert.equal(after.check.proposal_decision,'accepted');assert.equal(after.check.decided_by,'admin@example.test');
+ assert.ok(after.events.some(event=>event.action==='grok_proposal_accepted'));
+ assert.equal((await request(e,path,'POST',{revision:3,decision:'accepted'},true)).response.status,409);
+ assert.equal((await request(e,'/api/published/export','GET',null,true)).response.status,401);
+});
+test('修正案の見送りは本文を保持し、編集後の古い修正案・他の記事の修正案は採用できない',async()=>{
+ for(const scenario of ['decline','edited','other']) {
+  const e=env(),id=await submitted(e),queued=await checkRequest(e,id);
+  const original=e.DB.sql.prepare('SELECT body_markdown FROM articles WHERE id=?').get(id).body_markdown;
+  await request(e,'/api/ingest/checks/'+queued.id+'/result','POST',{...grokResult(1),proposed_body_markdown:original+'\n\n新しい使い方を確認しましょう。'});
+  if(scenario==='edited') e.DB.sql.prepare("UPDATE articles SET body_markdown=body_markdown||'編集',revision=revision+1 WHERE id=?").run(id);
+  const target=scenario==='other'?crypto.randomUUID():id;
+  const result=await request(e,'/api/admin/articles/'+target+'/checks/'+queued.id+'/decision','POST',{revision:scenario==='edited'?3:2,decision:scenario==='decline'?'declined':'accepted'},true);
+  assert.equal(result.response.status,scenario==='decline'?200:409);
+  const row=e.DB.sql.prepare('SELECT * FROM articles WHERE id=?').get(id);
+  assert.equal(row.body_markdown,original+(scenario==='edited'?'編集':''));
+  assert.equal(e.DB.sql.prepare('SELECT proposal_decision FROM article_checks WHERE id=?').get(queued.id).proposal_decision,scenario==='decline'?'declined':null);
+ }
+});
+test('初期記事を編集者が改訂し、承認後だけ同じURLの静的記事へ出力する',async()=>{
+ const e=env();await e.DB.prepare('INSERT INTO editors(email,active,added_by,updated_at) VALUES(?,1,?,?)').bind('editor@example.test','admin@example.test',new Date().toISOString()).run();
+ let catalog=(await request(e,'/api/admin/publications','GET',null,'editor')).data;
+ const initial=catalog.items.find(row=>row.slug==='moisturizer-basics');assert.ok(initial);assert.equal(initial.origin,'initial');
+ assert.equal((await request(e,'/api/admin/publications/edit','POST',{slug:initial.slug,revision_token:'wrong'},'editor')).response.status,409);
+ const started=await request(e,'/api/admin/publications/edit','POST',{slug:initial.slug,revision_token:initial.revision_token},'editor');assert.equal(started.response.status,200);
+ const id=started.data.id;let row=e.DB.sql.prepare('SELECT * FROM articles WHERE id=?').get(id);assert.equal(row.original_slug,initial.slug);assert.equal(row.status,'pending_review');assert.match(row.body_markdown,/## まずは製品の形から/);
+ const {approvedFiles}=await import('../worker/releases.mjs');assert.equal((await approvedFiles(e)).files.length,0);
+ catalog=(await request(e,'/api/admin/publications','GET',null,'editor')).data;
+ const entry=catalog.items.find(row=>row.slug===initial.slug);assert.equal(entry.article_id,id);
+ const reopen=await request(e,'/api/admin/publications/edit','POST',{slug:entry.slug,revision_token:entry.revision_token},'editor');assert.equal(reopen.data.id,id);
+ await processAll(e);
+ assert.equal((await request(e,'/api/admin/articles/'+id+'/review','POST',{revision:2,status:'published',confirmed:true},'editor')).response.status,200);
+ const snapshot=(await approvedFiles(e)).files[0];assert.equal(snapshot.path,'src/content/approved-articles/'+initial.slug+'.json');
+ const content=JSON.parse(snapshot.content);assert.equal(content.originalSlug,initial.slug);assert.deepEqual(content.relatedIngredients,['ceramide','hyaluronic-acid','glycerin']);
+ assert.equal(content.updatedAt,new Date(Date.now()+9*60*60*1000).toISOString().slice(0,10));
+ const revision=await request(e,'/api/admin/articles/'+id+'/revise','POST',{revision:3},'editor');assert.equal(revision.response.status,200);assert.equal((await approvedFiles(e)).files.length,0);
+ assert.throws(()=>e.DB.sql.prepare('UPDATE articles SET original_slug=NULL WHERE id=?').run(id),/origin is immutable/);
+ assert.equal((await request(e,'/api/admin/publications/edit','POST',{slug:'mens-care-basics',revision_token:'static:unused'},true)).response.status,404);
+});
+test('初期記事の承認済み改訂だけが静的出力で元記事と同じslugを使える',async()=>{
+ const root=await mkdtemp(join(tmpdir(),'beauty-revised-'));try {
+  await mkdir(join(root,'src/content/articles'),{recursive:true});await mkdir(join(root,'src/content/approved-articles'),{recursive:true});
+  await writeFile(join(root,'src/content/articles/moisturizer-basics.json'),'{}');
+  const raw={id:crypto.randomUUID(),slug:'moisturizer-basics',original_slug:'moisturizer-basics',title:'保湿の記事を改訂',body_markdown:'使い心地を確認しながら保湿のケアを考える記事です。製品表示を読み、気になることは専門家に相談しましょう。',excerpt:'改訂記事',category:'skin',tags:[],citations:[],updated_at:'2026-10-20T16:00:00.000Z',display_updated_at:'2026-10-21',published_at:'2026-10-20T16:00:00.000Z',revision:2};
+  assert.equal(toStaticArticle(raw).updatedAt,'2026-10-21');
+  const {articleFile}=await import('../shared/release-content.mjs');const file=await articleFile(raw);
+  await writeFile(join(root,file.path),file.content);assert.equal(await exportContent({CONTENT_MODE:'git',WORKERS_CI_BRANCH:'develop'},root),1);
+  const manifest=JSON.parse(await readFile(join(root,'public/content-manifest.json'),'utf8'));assert.equal(manifest.articles[0].original_slug,raw.slug);
+  const invalid=JSON.parse(file.content);delete invalid.originalSlug;await writeFile(join(root,file.path),JSON.stringify(invalid));
+  await assert.rejects(exportContent({CONTENT_MODE:'git',WORKERS_CI_BRANCH:'develop'},root),/slug collision/);
+ }finally{await rm(root,{recursive:true,force:true});}
 });

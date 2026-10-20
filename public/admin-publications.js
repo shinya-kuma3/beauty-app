@@ -90,6 +90,9 @@
           "/";
         link.target = "_blank";
         link.rel = "noopener noreferrer";
+        const edit=el('button','編集する');
+        edit.className='secondary';edit.type='button';
+        edit.onclick=()=>window.dispatchEvent(new CustomEvent('edit-publication',{detail:{slug:item.slug,revision_token:item.revision_token}}));
         const button = el("button", "非公開にする");
         button.className = "danger";
         button.onclick = () => {
@@ -103,7 +106,7 @@
         };
         const tools = el("div", "");
         tools.className = "tools";
-        tools.append(link, button);
+        tools.append(link, edit, button);
         card.append(tools);
       }
       list.append(card);

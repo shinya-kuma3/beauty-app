@@ -11,10 +11,12 @@ const visible=r=>r.data.status==='published'&&!(r.collection==='articles'&&hidde
 const index = JSON.parse(
   await readFile('dist/search-index.json', 'utf8'),
 );
-const published = records.filter(visible);
+let published = records.filter(visible);
 const manifest = JSON.parse(
   await readFile('dist/content-manifest.json', 'utf8'),
 );
+const overridden=new Set(manifest.articles.map(row=>row.original_slug).filter(Boolean));
+published=published.filter(row=>row.collection!=='articles'||!overridden.has(row.id));
 assert.equal(
   index.length,
   published.length + manifest.articles.length,
@@ -28,7 +30,7 @@ for (const entry of published) {
   );
 }
 for (const entry of records.filter(
-  (r) => !visible(r),
+  (r) => !visible(r) && !(r.collection==='articles'&&overridden.has(r.id)),
 )) {
   assert.ok(!index.some((item) => item.title === entry.data.title));
   await assert.rejects(

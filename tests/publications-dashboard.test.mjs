@@ -52,7 +52,11 @@ test("編集者も初期記事を選べ、理由・確認付きの非公開操�
     await settle();
     const $ = (id) => w.document.getElementById(id);
     assert.equal($("publication-tools").hidden, false);
-    w.document.querySelector("#publication-list button").click();
+    let editRequest=null;w.addEventListener('edit-publication',e=>editRequest=e.detail);
+    w.document.querySelector('#publication-list button.secondary').click();
+    assert.equal(editRequest.slug,entry.slug);assert.equal(editRequest.revision_token,entry.revision_token);
+    assert.equal(posted,null);
+    w.document.querySelector("#publication-list button.danger").click();
     assert.equal($("withdraw-dialog").open, true);
     const form = $("withdraw-form");
     form.dispatchEvent(new w.Event("submit", { cancelable: true }));

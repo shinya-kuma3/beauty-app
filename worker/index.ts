@@ -1,3 +1,4 @@
+import {reviseArticle,editPublication} from './revisions.mjs';
 import { healthOverview, syncHealth, recordHttpFailure } from './health.mjs';
 import { billingOverview, importCursor, syncCloudflare } from './billing.mjs';
 import {publications,requestWithdrawal,withdrawalManifest,markWithdrawalBuild} from './withdrawals.mjs';
@@ -18,6 +19,7 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import {
   latestCheck,
+  decideProposal,
   requestCheck,
   pendingChecks,
   completeCheck,
@@ -278,6 +280,7 @@ app.delete("/api/admin/feedback/:id", async (c) => {
   if (!result.meta.changes) throw new ApiError(404, "not_found");
   return c.json({ ok: true });
 });
+app.post('/api/admin/publications/edit',async(c)=>c.json(await editPublication(c.env,await json(c,5000),c.get('admin'))));
 app.get('/api/admin/publications',async(c)=>c.json(await publications(c.env,c.req.query())));
 app.post('/api/admin/publications/withdraw',async(c)=>c.json(await requestWithdrawal(c.env,await json(c,5000),c.get('admin')),201));
 app.get('/api/admin/me', (c) =>
@@ -755,44 +758,13 @@ app.patch('/api/admin/articles/:id', async (c) => {
     throw new ApiError(409, 'revision_conflict');
   return c.json({ id, revision: data.revision + 1 });
 });
+app.post('/api/admin/articles/:id/checks/:checkId/decision',async(c)=>c.json(await decideProposal(c.env,c.req.param('id'),c.req.param('checkId'),await json(c,5000),c.get('admin'))));
 app.post('/api/admin/articles/:id/revise', async (c) => {
   const data = parse(
     z.object({ revision: z.number().int().positive() }).strict(),
     await json(c),
   );
-  const id = c.req.param('id'),
-    time = now(),
-    token = crypto.randomUUID();
-  const row: any = await c.env.DB.prepare(
-    "SELECT content_hash FROM articles WHERE id=? AND revision=? AND status='published'",
-  )
-    .bind(id, data.revision)
-    .first();
-  if (!row) throw new ApiError(409, 'revision_conflict');
-  const result = await c.env.DB.batch([
-    c.env.DB.prepare(
-      "UPDATE articles SET status='draft',revision=revision+1,published_at=NULL,reviewed_by=NULL,updated_at=?,ai_status='queued',mutation_token=? WHERE id=? AND revision=? AND status='published'",
-    ).bind(time, token, id, data.revision),
-    c.env.DB.prepare(
-      "UPDATE articles SET status='pending_review' WHERE id=? AND mutation_token=? AND status='draft'",
-    ).bind(id, token),
-    c.env.DB.prepare(
-      "INSERT INTO review_events(article_id,actor,action,revision,created_at) SELECT id,?,'revision_started',revision,? FROM articles WHERE id=? AND mutation_token=?",
-    ).bind(c.get('admin'), time, id, token),
-    c.env.DB.prepare(
-      "INSERT OR IGNORE INTO ai_jobs(id,entity_type,entity_id,content_hash,next_attempt_at,created_at) SELECT ?,'article',id,content_hash,?,? FROM articles WHERE id=? AND mutation_token=?",
-    ).bind(crypto.randomUUID(), time, time, id, token),
-    c.env.DB.prepare(
-      "UPDATE ai_jobs SET state='queued',attempts=0,next_attempt_at=?,lease_until=NULL,error_code=NULL WHERE entity_type='article' AND entity_id=? AND content_hash=? AND EXISTS(SELECT 1 FROM articles WHERE id=? AND mutation_token=?)",
-    ).bind(time, id, row.content_hash, id, token),
-  ]);
-  if (!result[0].meta.changes)
-    throw new ApiError(409, 'revision_conflict');
-  return c.json({
-    id,
-    status: 'pending_review',
-    revision: data.revision + 1,
-  });
+  return c.json(await reviseArticle(c.env,c.req.param('id'),data.revision,c.get('admin')));
 });
 app.post('/api/admin/articles/:id/review', async (c) => {
   const body = await json(c);
@@ -828,12 +800,13 @@ app.post('/api/admin/articles/:id/review', async (c) => {
   const publicationId = crypto.randomUUID();
   const statements = [
     c.env.DB.prepare(
-      "UPDATE articles SET status=?,published_at=?,reviewed_by=?,updated_at=?,revision=revision+1,mutation_token=? WHERE id=? AND revision=? AND status='pending_review'",
+      "UPDATE articles SET status=?,published_at=?,reviewed_by=?,updated_at=?,display_updated_at=?,revision=revision+1,mutation_token=? WHERE id=? AND revision=? AND status='pending_review'",
     ).bind(
       body.status,
       body.status === 'published' ? time : null,
       actor,
       time,
+      body.status==='published'?new Date(new Date(time).getTime()+9*60*60*1000).toISOString().slice(0,10):null,
       publicationId,
       id,
       body.revision,
@@ -1019,7 +992,7 @@ app.get('/api/published/export', async (c) => {
     throw new ApiError(409, 'environment_mismatch');
   const rows = (
     await c.env.DB.prepare(
-      "SELECT id,slug,title,body_markdown,excerpt,category,tags,citations,updated_at,published_at,revision FROM articles a WHERE status='published' AND published_at IS NOT NULL AND reviewed_by IS NOT NULL AND NOT EXISTS(SELECT 1 FROM article_withdrawals w WHERE w.slug=a.slug) ORDER BY published_at DESC",
+      "SELECT id,slug,original_slug,display_updated_at,title,body_markdown,excerpt,category,tags,citations,updated_at,published_at,revision FROM articles a WHERE status='published' AND published_at IS NOT NULL AND reviewed_by IS NOT NULL AND NOT EXISTS(SELECT 1 FROM article_withdrawals w WHERE w.slug=a.slug) ORDER BY published_at DESC",
     ).all()
   ).results;
   return c.json({

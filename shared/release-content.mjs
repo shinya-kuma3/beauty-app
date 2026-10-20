@@ -1,6 +1,9 @@
+import {originalArticles} from '../worker/original-articles.mjs';
 import { z } from 'zod';
 export const exportedArticle = z
   .object({
+    display_updated_at: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+    original_slug: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/).nullable().optional(),
     id: z.uuid(),
     slug: z
       .string()
@@ -27,7 +30,8 @@ export function toStaticArticle(row) {
     category: row.category,
     tags: row.tags,
     status: 'published',
-    updatedAt: row.updated_at.slice(0, 10),
+    updatedAt: row.display_updated_at ?? row.updated_at.slice(0,10),
+    ...(row.original_slug ? {originalSlug:row.original_slug} : {}),
     sections: [{ heading: '記事本文', body: row.body_markdown }],
     sources: row.citations.map((url) => ({
       title: new URL(url).hostname,
@@ -38,7 +42,7 @@ export function toStaticArticle(row) {
       60,
       Math.max(1, Math.ceil(row.body_markdown.length / 500)),
     ),
-    relatedIngredients: [],
+    relatedIngredients: originalArticles.find(initial=>initial.slug===row.original_slug)?.data.relatedIngredients ?? [],
     bodyMarkdown: row.body_markdown,
     aiAssisted: true,
     dbId: row.id,
@@ -48,6 +52,7 @@ export function toStaticArticle(row) {
 
 export const staticArticleSchema = z
   .object({
+    originalSlug: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/).optional(),
     title: z.string().min(1).max(120),
     summary: z.string().min(1).max(300),
     category: z.enum(['skin', 'hair', 'nail', 'body']),

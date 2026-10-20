@@ -1,4 +1,5 @@
 const $ = (id) => document.getElementById(id);
+let currentCheck = null;
 let current = null,
   nextCursor = null,
   total = 0,
@@ -33,6 +34,7 @@ const states = {
   waiting_configuration: '公開設定待ち',
 };
 const messages = {
+  proposal_obsolete: '本文または確認結果が更新されています。一覧を更新して、最新の修正案と比較してください。',
   article_withdrawn: '非公開依頼済みの記事は、再公開できません。',
   unauthorized: '認証が必要です。',
   admin_access_required: '許可されたアカウントでログインしてください。',
@@ -119,6 +121,7 @@ async function action(task) {
 }
 function updateActions() {
   if (!current) return;
+  document.querySelectorAll('[data-proposal-decision]').forEach(button=>{button.disabled=busy||dirty||current.status!=='pending_review'||!currentCheck||currentCheck.stale||!!currentCheck.proposal_decision;});
   $('start-revision').hidden = current.status !== 'published';
   $('start-revision').disabled = busy;
   const editable = current.status === 'pending_review';
@@ -256,7 +259,103 @@ function setRecheckState(id, pending) {
   if (pending && !old) button.append(el('span', 'Grok再チェック中', 'recheck-status'));
   if (!pending && old) old.remove();
 }
+function renderProposal(check) {
+  const proposal = check.result?.proposed_body_markdown;
+  if (!proposal) {
+    if (check.state === 'complete')
+      $('check-result').append(
+        el(
+          'p',
+          '本文の修正案はありません。確認メモをもとに必要な箇所を編集してください。',
+          'hint',
+        ),
+      );
+    return;
+  }
+  const panel = el('section', undefined, 'proposal-panel');
+  panel.id = 'proposal-comparison';
+  panel.append(
+    el('h3', '本文の変更を比較する'),
+    el(
+      'p',
+      '赤い行は削除・変更される部分、緑の行は追加・変更案です。採用しても、公開の承認まではサイトの本文は変わりません。',
+      'hint',
+    ),
+  );
+  panel.append(
+    BeautyArticleDiff.render(document, current.body_markdown, proposal),
+  );
+  if (check.proposal_decision)
+    panel.append(
+      el(
+        'p',
+        (check.proposal_decision === 'accepted'
+          ? '変更を採用しました'
+          : '変更しないを選びました') +
+          ' ・ ' +
+          date(check.decided_at) +
+          ' ・ ' +
+          check.decided_by,
+        'proposal-decision',
+      ),
+    );
+  else {
+    if (check.stale)
+      panel.append(
+        el(
+          'p',
+          '依頼後に記事が更新されています。この修正案は採用できません。再チェックを依頼してください。',
+          'hint',
+        ),
+      );
+    const tools = el('div', undefined, 'tools');
+    for (const [decision, label] of [
+      ['accepted', '変更を採用する'],
+      ['declined', '変更しない'],
+    ]) {
+      const button = el(
+        'button',
+        label,
+        decision === 'declined' ? 'secondary' : undefined,
+      );
+      button.type = 'button';
+      button.dataset.proposalDecision = decision;
+      button.onclick = () => {
+        if (busy || dirty || check.stale || current.status !== 'pending_review')
+          return;
+        const id = current.id,
+          revision = current.revision;
+        if (
+          !confirm(
+            decision === 'accepted'
+              ? 'Grokの修正案に本文を差し替えます。公開は別途承認が必要です。採用しますか？'
+              : '現在の本文を残し、この修正案を見送りますか？',
+          )
+        )
+          return;
+        action(async () => {
+          await api(
+            'articles/' + id + '/checks/' + check.id + '/decision',
+            'POST',
+            { revision, decision },
+          );
+          await list();
+          await openArticle(id);
+          switchPanel('ai');
+          return decision === 'accepted'
+            ? '修正案を採用しました。要約・タグの処理と本文を確認してから公開してください。'
+            : '本文を変更せず、修正案を見送りました。';
+        });
+      };
+      tools.append(button);
+    }
+    panel.append(tools);
+  }
+  $('check-result').append(panel);
+}
+
 function renderCheck(check) {
+  currentCheck=check;
   $('check-result').replaceChildren();
   if (current) setRecheckState(current.id, !!check && check.state === 'pending' && !check.stale);
   if (!check) {
@@ -265,7 +364,7 @@ function renderCheck(check) {
     return;
   }
   $('check-state').textContent =
-    (check.stale
+    (check.stale && !check.proposal_decision
       ? '本文や出典が変わったため、前の結果です。再チェックしてください。 '
       : '') +
     (states[check.state] || check.state) +
@@ -316,6 +415,7 @@ function renderCheck(check) {
     el('p', date(check.completed_at) + ' ・ ' + check.model, 'hint'),
   );
   $('check-result').append(scope, el('p', check.result.overview));
+  renderProposal(check);
   for (const [label, value] of [
     ['参考情報の補足', check.result.primary_source_notes],
     ['PR・利益相反', check.result.pr_notes],
@@ -459,6 +559,10 @@ async function openArticle(id) {
     ai_check_requested: '以前のAIチェックを依頼',
     grok_check_requested: 'Grok Botに再チェックを依頼',
     grok_check_completed: 'Grok Botの確認結果を受け取り',
+    grok_proposal_accepted: 'Grokの修正案を採用',
+    grok_proposal_declined: 'Grokの修正案を見送り',
+    initial_revision_started: '初期記事の改訂を開始',
+    revision_started: '公開記事の改訂を開始',
   };
   $('history').replaceChildren();
   for (const event of [...data.events].reverse()) {
@@ -869,7 +973,7 @@ $('start-revision').onclick = () => {
       revision: current.revision,
     });
     await list();
-    await openArticle(current.id);
+    await openArticle(current.id);switchPanel('edit');
     return '改訂版を作成しました。現在の公開記事は、新しい版の審査が完了するまでそのままです。';
   });
 };
@@ -904,4 +1008,15 @@ action(async () => {
   tagPicker = BeautyTagPicker.create($('admin-tags'));
   await refresh();
   return '記事を選んで編集・確認を始めてください。';
+});
+
+window.addEventListener('edit-publication',event=>{
+ if(busy) return;
+ if(dirty&&!confirm('未保存の変更があります。公開記事の編集へ移動しますか？')) return;
+ action(async()=>{
+  const result=await api('publications/edit','POST',event.detail);
+  dirty=false;$('article-filters').reset();tagPicker.setSelected([]);$('status').value='pending_review';previousStatus='pending_review';appliedFilters=new URLSearchParams({status:'pending_review',keyword_mode:'all'});
+  await list();await openArticle(result.id);switchPanel('edit');$('detail').scrollIntoView?.({behavior:'smooth',block:'start'});
+  return '編集できます。再公開が完了するまで、現在の公開記事はそのまま残ります。';
+ });
 });

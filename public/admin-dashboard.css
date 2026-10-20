@@ -677,3 +677,10 @@ button.danger:focus-visible {
 #health-quotas{grid-template-columns:repeat(4,minmax(0,1fr))}.health-chip.caution{color:#8f621d;background:#fff2d8}@media(max-width:1100px){#health-quotas{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:600px){#health-quotas{grid-template-columns:1fr}}
 
 .article-item.rechecking{background:#edf8f1;border-color:#9bc8ad;color:#244e3b}.article-item.rechecking:hover{background:#e3f3e9;border-color:#6ca784}.article-item.rechecking.selected{background:#d9efe2;border-color:#4d956c;box-shadow:inset 3px 0 0 #4d956c}.article-item.rechecking small{color:#4d735f}.recheck-status{display:inline-flex;align-items:center;margin-top:9px;padding:3px 9px;background:#d4ecde;color:#276344;border-radius:99px;font-size:11px;font-weight:600}.single-recheck pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;font-family:inherit;line-height:1.8}.single-recheck details{margin-top:12px}.single-recheck summary{cursor:pointer}
+
+.proposal-panel{margin:24px 0;padding:20px;border:1px solid #bdd7e8;border-radius:12px;background:#f8fbfe}
+.proposal-comparison{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;margin:16px 0}
+.proposal-comparison section{min-width:0}.proposal-comparison h4{margin:0 0 10px}
+.proposal-text{margin:0;max-height:520px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;border:1px solid #d4e2ec;border-radius:8px;background:white;font:14px/1.8 system-ui,sans-serif;padding:12px}
+.diff-line{display:block;min-height:1.8em}.diff-added{background:#e0f2e6;color:#195637}.diff-removed{background:#ffebeb;color:#8c3038}.proposal-decision{padding:12px;background:#eaf4fc;border-radius:8px}
+@media(max-width:760px){.proposal-comparison{grid-template-columns:1fr}.proposal-panel{padding:12px}.proposal-text{max-height:360px}}

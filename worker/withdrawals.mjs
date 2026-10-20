@@ -56,11 +56,14 @@ async function catalog(env) {
   );
   const rows = (
     await env.DB.prepare(
-      "SELECT id,slug,title,excerpt,category,revision FROM articles a WHERE a.status='published' OR EXISTS(SELECT 1 FROM publication_jobs p WHERE p.article_id=a.id)",
+      "SELECT id,slug,title,excerpt,category,revision,original_slug FROM articles a WHERE a.status='published' OR a.original_slug IS NOT NULL OR EXISTS(SELECT 1 FROM publication_jobs p WHERE p.article_id=a.id)",
     ).all()
   ).results;
   return [
-    ...originals,
+    ...originals.map(initial=>{
+      const revision=rows.find(row=>row.original_slug===initial.slug);
+      return revision?{...initial,title:revision.title,excerpt:revision.excerpt,article_id:revision.id,revision_token:'db:'+revision.revision}:initial;
+    }),
     ...rows
       .filter((row) => !originals.some((item) => item.slug === row.slug))
       .map((row) => ({

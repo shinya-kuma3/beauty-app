@@ -56,6 +56,7 @@ export async function reviewInput(_env, row, sources) {
 export const grokResultSchema = reviewSchema
   .extend({
     revision: z.number().int().positive(),
+    proposed_body_markdown: z.string().trim().min(40).max(50000).optional(),
     ai_check_notes: z.string().trim().max(10000).default(''),
     checked_citations: z
       .array(

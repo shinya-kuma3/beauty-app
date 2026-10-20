@@ -86,6 +86,7 @@ export async function exportContent(
         article = parseSnapshot(content);
       committed.push({
         slug: name.slice(0, -5),
+        original_slug: article.originalSlug,
         id: article.dbId,
         revision: article.reviewRevision,
         sha: await digest(content),
@@ -99,12 +100,12 @@ export async function exportContent(
   );
   const seen = new Set();
   for (const row of committed) {
-    if (originals.has(row.slug) || seen.has(row.slug))
+    if ((originals.has(row.slug) && row.original_slug!==row.slug) || (row.original_slug && (!originals.has(row.slug) || row.original_slug!==row.slug)) || seen.has(row.slug))
       throw Error(`Article slug collision: ${row.slug}`);
     seen.add(row.slug);
   }
   for (const row of rows) {
-    if (originals.has(row.slug) || seen.has(row.slug))
+    if ((originals.has(row.slug) && row.original_slug!==row.slug) || (row.original_slug && (!originals.has(row.slug) || row.original_slug!==row.slug)) || seen.has(row.slug))
       throw new Error(`Article slug collision: ${row.slug}`);
     seen.add(row.slug);
     await writeFile(
@@ -119,8 +120,9 @@ export async function exportContent(
       environment: expected,
       withdrawals: visibility.withdrawals,
       articles: live
-        ? rows.filter(row=>!hidden.has(row.slug)).map((row) => ({ id: row.id, revision: row.revision }))
-        : committed.filter(row=>!hidden.has(row.slug)).map(({ id, revision, sha }) => ({
+        ? rows.filter(row=>!hidden.has(row.slug)).map((row) => ({ id: row.id, revision: row.revision, ...(row.original_slug?{original_slug:row.original_slug}:{}) }))
+        : committed.filter(row=>!hidden.has(row.slug)).map(({ id, revision, sha, original_slug }) => ({
+            ...(original_slug?{original_slug}:{}),
             id,
             revision,
             sha,

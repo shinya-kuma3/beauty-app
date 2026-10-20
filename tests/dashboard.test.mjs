@@ -120,6 +120,7 @@ async function setup(role = 'editor', members = [], articles = [row]) {
     return Response.json({});
   };
   window.eval(pickerScript);
+  window.eval(await readFile(new URL('../public/article-diff.js',import.meta.url),'utf8'));
   window.eval(script);
   await settle();
   return {
@@ -427,4 +428,20 @@ test('再チェックは選択した1記事だけを依頼し、その記事だ�
 test('一覧の再取得でも依頼中の色を復元し、古い版や完了の状態を緑にしない',async()=>{
  const s=await setup('editor',[],[{...row,recheck_pending:1},{...row,id:'other',recheck_pending:0}]);
  try {const items=[...s.$('articles').querySelectorAll('.article-item')];assert.equal(items[0].classList.contains('rechecking'),true);assert.equal(items[1].classList.contains('rechecking'),false);s.setCheck(row.id,{state:'pending',stale:true});items[0].click();await settle();assert.equal(items[0].classList.contains('rechecking'),false);}finally{await s.window.happyDOM.close();}
+});
+
+
+test('Grok修正案は原文と並べて安全に表示し、採用先を個別記事に限定する',async()=>{
+ const s=await setup();try {
+  s.setCheck(row.id,{id:'proposal-1',state:'complete',stale:false,revision:1,body_chars:100,reviewed_chars:100,result:{overview:'文章を整理しました',findings:[],questions:[],proposed_body_markdown:'新しい本文です。\n<script>alert(1)</script>'}});
+  s.$('articles').querySelector('button').click();await settle();
+  const panel=s.$('proposal-comparison');assert.ok(panel);assert.match(panel.textContent,/現在の記事本文/);assert.match(panel.textContent,/Grokの修正案/);
+  assert.equal(panel.querySelector('script'),null);assert.match(panel.querySelector('.diff-added').textContent,/新しい本文/);assert.match(panel.querySelector('.diff-removed').textContent,/保存済み/);
+  const accept=panel.querySelector('[data-proposal-decision="accepted"]');assert.equal(accept.disabled,false);
+  s.$('editor').elements.title.value='未保存';s.$('editor').elements.title.dispatchEvent(new s.window.Event('input',{bubbles:true}));assert.equal(accept.disabled,true);
+  s.$('articles').querySelector('button').click();await settle();
+  s.$('proposal-comparison').querySelector('[data-proposal-decision="accepted"]').click();await settle();
+  const call=s.calls.find(call=>call.path==='articles/'+row.id+'/checks/proposal-1/decision');assert.ok(call);assert.equal(call.body.decision,'accepted');assert.equal(call.body.revision,row.revision);
+  assert.equal(s.calls.some(call=>call.path.endsWith('/review')),false);
+ }finally{await s.window.happyDOM.close();}
 });

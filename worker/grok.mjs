@@ -1,4 +1,5 @@
-import { ApiError, hash, now, parse, reviewFlags } from './core.mjs';
+import { ApiError, hash, now, parse, reviewFlags, contentHash } from './core.mjs';
+import { z } from 'zod';
 import { grokResultSchema, reviewInput } from './review.mjs';
 export async function sourcesFor(db, id) {
   return (
@@ -27,6 +28,10 @@ export async function latestCheck(env, row, sources) {
     completed_at: check.completed_at,
     model: 'Grok Bot（外部）',
     result: check.result ? JSON.parse(check.result) : null,
+    original_body_markdown: JSON.parse(check.input_text).body_markdown,
+    proposal_decision: check.proposal_decision,
+    decided_by: check.decided_by,
+    decided_at: check.decided_at,
     body_chars: check.body_chars,
     reviewed_chars: check.reviewed_chars,
     stale:
@@ -69,7 +74,7 @@ export async function requestCheck(env, id, revision, actor) {
       revision,
     ),
     env.DB.prepare(
-      "UPDATE article_checks SET state='pending',revision=?,input_text=?,requested_by=?,created_at=?,result=NULL,model=NULL,completed_at=NULL,response_hash=NULL,completed_revision=NULL,ai_check_notes=NULL WHERE id=? AND provider='grok' AND EXISTS(SELECT 1 FROM articles WHERE id=? AND revision=? AND status='pending_review') AND (state!='pending' OR revision!=?)",
+      "UPDATE article_checks SET proposal_decision=NULL,decided_by=NULL,decided_at=NULL,state='pending',revision=?,input_text=?,requested_by=?,created_at=?,result=NULL,model=NULL,completed_at=NULL,response_hash=NULL,completed_revision=NULL,ai_check_notes=NULL WHERE id=? AND provider='grok' AND EXISTS(SELECT 1 FROM articles WHERE id=? AND revision=? AND status='pending_review') AND (state!='pending' OR revision!=?)",
     ).bind(
       revision,
       input.input_text,
@@ -133,7 +138,7 @@ export async function pendingChecks(env, limit = 1, filter = {}) {
       result_endpoint: "/api/ingest/checks/" + check.id + "/result",
       article: JSON.parse(check.input_text),
       instructions:
-        "この依頼のarticle_idとrevisionで指定した1記事だけを確認してください。他の記事や依頼をまとめて確認せず、全記事一覧の取得・再審査は行わないでください。結果はこの依頼のresult_endpointだけに返してください。美容の話題、使い方、商品紹介、体験談を扱う記事として、読みやすさ・表記・素材との意味の相違・PR表示を確認してください。論文や科学的根拠の提示・裏付けは掲載条件ではなく、それらがないことを指摘や公開停止の理由にしないでください。参考にしたX・YouTubeのURLは残し、論文・科学的根拠へのリンクは記事に含めないでください。元資料にない事実や体験は創作しないでください。日本語の確認メモと指摘を返し、専門用語には原語を残してください。記事の公開・削除・本文編集はできません。",
+        "この依頼のarticle_idとrevisionで指定した1記事だけを確認してください。他の記事や依頼をまとめて確認せず、全記事一覧の取得・再審査は行わないでください。結果はこの依頼のresult_endpointだけに返してください。美容の話題、使い方、商品紹介、体験談を扱う記事として、読みやすさ・表記・素材との意味の相違・PR表示を確認してください。論文や科学的根拠の提示・裏付けは掲載条件ではなく、それらがないことを指摘や公開停止の理由にしないでください。参考にしたX・YouTubeのURLは残し、論文・科学的根拠へのリンクは記事に含めないでください。元資料にない事実や体験は創作しないでください。日本語の確認メモと指摘を返し、専門用語には原語を残してください。修正案がある場合はproposed_body_markdownに省略せず修正後の本文全体をMarkdownで返してください。修正不要ならこの項目は省略してください。修正案は編集者が比較・採用するまでは本文に反映されません。記事の公開・削除・本文編集はできません。",
     });
     break;
   }
@@ -202,3 +207,73 @@ export async function completeCheck(env, id, body) {
   if (!out[0].meta.changes) throw new ApiError(409, 'check_obsolete');
   return { id, state: 'complete', revision: check.revision + 1 };
 }
+
+export async function decideProposal(env, articleId, checkId, body, actor) {
+  const data = parse(
+    z
+      .object({
+        revision: z.number().int().positive(),
+        decision: z.enum(['accepted', 'declined']),
+      })
+      .strict(),
+    body,
+  );
+  const row = await env.DB.prepare(
+    "SELECT * FROM articles WHERE id=? AND revision=? AND status='pending_review'",
+  )
+    .bind(articleId, data.revision)
+    .first();
+  const check = await env.DB.prepare(
+    "SELECT * FROM article_checks WHERE id=? AND article_id=? AND provider='grok' AND state='complete'",
+  )
+    .bind(checkId, articleId)
+    .first();
+  if (!row || !check || check.proposal_decision)
+    throw new ApiError(409, 'proposal_obsolete');
+  const input = await reviewInput(env, row, await sourcesFor(env.DB, row.id));
+  const proposal = JSON.parse(check.result).proposed_body_markdown;
+  if (
+    !proposal ||
+    input.content_hash !== check.content_hash ||
+    check.ai_check_notes !== row.ai_check_notes
+  )
+    throw new ApiError(409, 'proposal_obsolete');
+  const bodyMarkdown =
+    data.decision === 'accepted' ? proposal : row.body_markdown;
+  const checksum = await contentHash({ ...row, body_markdown: bodyMarkdown });
+  const time = now(),
+    token = crypto.randomUUID();
+  const out = await env.DB.batch([
+    env.DB.prepare(
+      "UPDATE articles SET body_markdown=?,content_hash=?,metadata_edited=1,ai_status=CASE WHEN content_hash=? THEN ai_status ELSE 'queued' END,revision=revision+1,updated_at=?,mutation_token=? WHERE id=? AND revision=? AND status='pending_review' AND EXISTS(SELECT 1 FROM article_checks WHERE id=? AND proposal_decision IS NULL)",
+    ).bind(
+      bodyMarkdown,
+      checksum,
+      checksum,
+      time,
+      token,
+      articleId,
+      data.revision,
+      checkId,
+    ),
+    env.DB.prepare(
+      'UPDATE article_checks SET proposal_decision=?,decided_by=?,decided_at=? WHERE id=? AND proposal_decision IS NULL AND EXISTS(SELECT 1 FROM articles WHERE id=? AND mutation_token=?)',
+    ).bind(data.decision, actor, time, checkId, articleId, token),
+    env.DB.prepare(
+      'INSERT INTO review_events(article_id,actor,action,revision,created_at) SELECT id,?,?,revision,? FROM articles WHERE id=? AND mutation_token=?',
+    ).bind(actor, 'grok_proposal_' + data.decision, time, articleId, token),
+    env.DB.prepare(
+      "INSERT OR IGNORE INTO ai_jobs(id,entity_type,entity_id,content_hash,next_attempt_at,created_at) SELECT ?,'article',id,content_hash,?,? FROM articles WHERE id=? AND mutation_token=? AND ai_status='queued'",
+    ).bind(crypto.randomUUID(), time, time, articleId, token),
+    env.DB.prepare(
+      "UPDATE ai_jobs SET state='queued',attempts=0,next_attempt_at=?,lease_until=NULL,error_code=NULL WHERE entity_type='article' AND entity_id=? AND content_hash=? AND EXISTS(SELECT 1 FROM articles WHERE id=? AND mutation_token=? AND ai_status='queued')",
+    ).bind(time, articleId, checksum, articleId, token),
+  ]);
+  if (!out[0].meta.changes) throw new ApiError(409, 'proposal_obsolete');
+  return {
+    id: articleId,
+    revision: data.revision + 1,
+    decision: data.decision,
+  };
+}
+

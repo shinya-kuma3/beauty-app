@@ -1,3 +1,5 @@
+import {readdirSync,readFileSync,existsSync} from 'node:fs';
+import {parseSnapshot} from '../shared/release-content.mjs';
 import { defineCollection } from 'astro:content';
 import { glob } from 'astro/loaders';
 import { z } from 'astro/zod';
@@ -53,16 +55,12 @@ const ingredients = defineCollection({
     caution: z.string().min(1),
   }),
 });
+const revisionFolder=process.env.CONTENT_PIPELINE_ENABLED==='true'&&process.env.WORKERS_CI_BRANCH!=='main'&&process.env.CONTENT_MODE!=='git'?'generated-articles':'approved-articles';
+const revisionPath=new URL('./content/'+revisionFolder+'/',import.meta.url);
+const overridden=existsSync(revisionPath)?readdirSync(revisionPath).filter(name=>name.endsWith('.json')).filter(name=>parseSnapshot(readFileSync(new URL(name,revisionPath),'utf8')).originalSlug===name.slice(0,-5)):[];
 const articles = defineCollection({
   loader: glob({
-    pattern: [
-      'articles/*.json',
-      process.env.CONTENT_PIPELINE_ENABLED === 'true' &&
-      process.env.WORKERS_CI_BRANCH !== 'main' &&
-      process.env.CONTENT_MODE !== 'git'
-        ? 'generated-articles/*.json'
-        : 'approved-articles/*.json',
-    ],
+    pattern: ['articles/*.json',revisionFolder+'/*.json',...overridden.map(name=>'!articles/'+name)],
     base: './src/content',
     generateId: ({ entry }) =>
       entry
@@ -74,6 +72,7 @@ const articles = defineCollection({
     ...common,
     readingMinutes: z.number().int().min(1).max(60),
     relatedIngredients: z.array(z.string()).default([]),
+    originalSlug: z.string().optional(),
     bodyMarkdown: z.string().optional(),
     aiAssisted: z.boolean().default(false),
     dbId: z.string().optional(),

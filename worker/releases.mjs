@@ -58,7 +58,7 @@ const resultSchema = z
   })
   .strict();
 const approvedColumns =
-  'id,slug,title,body_markdown,excerpt,category,tags,citations,updated_at,published_at,revision';
+  'id,slug,original_slug,display_updated_at,title,body_markdown,excerpt,category,tags,citations,updated_at,published_at,revision';
 async function currentArticle(env, id) {
   const raw = await env.DB.prepare(
     'SELECT ' +
