@@ -21,3 +21,5 @@ sourcesのkindはx、youtube、reference、officialを使えます。旧guidelin
 npm run validate:contentはデータ形式と参照、npm run checkは型、npm run buildは静的ページ、npm run test:buildは公開ページと検索・リンクを確認します。これらは科学的裏付けを判定する検査ではありません。
 
 成分診断の候補はsrc/lib/finder.mjsで管理します。対象部位・おすすめ理由・公開中の参照先を確認して変更します。成分を追加するだけでは診断候補へ自動追加しません。
+
+図鑑のsectionsには任意のhighlightを指定できます。bodyに含まれる短いフレーズをそのまま指定すると、本文の下に黄色いマーカーが表示されます。HTMLは使わず、各段落の要点を1か所に絞ります。ページ読み込み完了後にすべて同時に0.5秒で左から右へ描画し、動きを減らす設定では静止表示します。

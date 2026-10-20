@@ -31,6 +31,9 @@ export function validateRecords(records) {
     if (!Number.isFinite(date.getTime()) || date.toISOString().slice(0, 10) !== data.updatedAt) fail('updatedAt は実在する YYYY-MM-DD の日付にしてください');
     if (!Array.isArray(data.tags) || !data.tags.length || !data.tags.every((tag) => typeof tag === 'string' && tag.trim())) fail('tags に検索用の文字列を指定してください');
     if (!Array.isArray(data.sections) || !data.sections.length || !data.sections.every((s) => typeof s.heading === 'string' && s.heading.trim() && typeof s.body === 'string' && s.body.trim())) fail('sections に見出しと本文が必要です');
+    if (collection === 'ingredients' && Array.isArray(data.sections)) for (const section of data.sections) {
+      if (section.highlight !== undefined && (typeof section.highlight !== 'string' || !section.highlight.trim() || typeof section.body !== 'string' || !section.body.includes(section.highlight))) fail('highlight は本文に含まれるフレーズを指定してください');
+    }
     if (data.sources !== undefined && !Array.isArray(data.sources)) fail('参考リンクは配列にしてください');
     for (const source of Array.isArray(data.sources) ? data.sources : []) {
       try { if (new URL(source.url).protocol !== 'https:') fail('出典 URL は HTTPS にしてください'); } catch { fail('出典 URL が不正です'); }

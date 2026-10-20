@@ -41,6 +41,13 @@ const ingredients = defineCollection({
   schema: z.object({
     ...common,
     entryType: z.enum(['ingredient', 'care-item']).default('ingredient'),
+    sections: z.array(z.object({
+      heading: z.string().min(1),
+      body: z.string().min(1),
+      highlight: z.string().trim().min(1).optional(),
+    }).refine(section => !section.highlight || section.body.includes(section.highlight), {
+      message: 'highlight は本文に含まれるフレーズを指定してください',
+    })).min(1),
     englishName: z.string().min(1),
     role: z.string().min(1),
     caution: z.string().min(1),

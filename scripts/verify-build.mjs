@@ -64,7 +64,8 @@ for (const result of allMatches()) {
 // Exercise the scripts against the actual generated public page.
 const { Window } = await import('happy-dom');
 const { renderPublicMarkdown } = await import('../worker/core.mjs');
-for (const id of ['vitamin-c','booster']) {
+for (const entry of published.filter(row => row.collection === 'ingredients')) {
+  const { id } = entry;
   const page = new Window({settings:{disableJavaScriptFileLoading:true,disableCSSFileLoading:true}});
   try {
     page.document.write(await readFile('dist/ingredients/' + id + '/index.html','utf8'));
@@ -72,6 +73,14 @@ for (const id of ['vitamin-c','booster']) {
     assert.ok(record, id + ': public search entry');
     assert.equal(page.document.querySelector('h1').textContent, record.title);
     assert.equal(page.document.querySelector('.sources'), null, id + ': no scientific reference panel');
+    const paragraphs = [...page.document.querySelectorAll('.detail-body section p')];
+    assert.equal(paragraphs.length, entry.data.sections.length);
+    entry.data.sections.forEach((section, i) => {
+      assert.equal(paragraphs[i].textContent, section.body, id + ': marker preserves original text');
+      const markers = [...paragraphs[i].querySelectorAll('mark.point-marker')];
+      assert.equal(markers.length, section.highlight ? 1 : 0);
+      if (section.highlight) assert.equal(markers[0].textContent, section.highlight);
+    });
     if (id === 'booster') {
       assert.equal(record.entryType, 'care-item');
       assert.match(page.document.querySelector('.detail-meta').textContent, /ケアアイテム/);

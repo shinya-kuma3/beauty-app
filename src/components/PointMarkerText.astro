@@ -1,0 +1,28 @@
+---
+interface Props { text: string; highlight?: string; }
+const { text, highlight } = Astro.props;
+const start = highlight ? text.indexOf(highlight) : -1;
+---
+{start >= 0 && highlight ? <>{text.slice(0, start)}<mark class="point-marker">{highlight}</mark>{text.slice(start + highlight.length)}</> : text}
+
+<style>
+  .point-marker {
+    color: inherit;
+    background-color: transparent;
+    background-image: linear-gradient(#ffe68b, #ffe68b);
+    background-repeat: no-repeat;
+    background-position: left 92%;
+    background-size: 100% 45%;
+    -webkit-box-decoration-break: clone;
+    box-decoration-break: clone;
+  }
+  :global([data-marker-state="pending"]) .point-marker { background-size: 0% 45%; }
+  :global([data-marker-state="visible"]) .point-marker { animation: point-marker-sweep .5s ease-out both; }
+  @keyframes point-marker-sweep {
+    from { background-size: 0% 45%; }
+    to { background-size: 100% 45%; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .point-marker { animation: none !important; background-size: 100% 45% !important; }
+  }
+</style>
