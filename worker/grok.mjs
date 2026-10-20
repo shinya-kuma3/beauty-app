@@ -276,4 +276,3 @@ export async function decideProposal(env, articleId, checkId, body, actor) {
     decision: data.decision,
   };
 }
-
