@@ -1999,3 +1999,14 @@ test('Grokチェックは論文確認メモと参考URLを省略して返信で�
  assert.equal(result.response.status,200);
  const row=e.DB.sql.prepare('SELECT status FROM articles WHERE id=?').get(id);assert.equal(row.status,'pending_review');
 });
+
+
+test('監視APIは管理者専用で、収集キーと異なるOriginを拒否する',async()=>{
+ const e=env();for(const path of ['/api/admin/health','/api/admin/health/sync']){const method=path.endsWith('/sync')?'POST':'GET';assert.equal((await request(e,path,method,undefined,'editor')).response.status,403);assert.equal((await request(e,path,method)).response.status,403);}
+ const d=await request(e,'/api/admin/health','GET',undefined,true);assert.equal(d.response.status,200);assert.equal(d.data.configured,false);assert.equal(d.data.quotas.workers.remaining,null);
+ assert.equal((await app.request(base+'/api/admin/health/sync',{method:'POST',headers:{'Cf-Access-Jwt-Assertion':token,Origin:'https://evil.test'}},e)).status,403);
+ assert.equal((await request(e,'/api/admin/health/sync','POST',undefined,true)).response.status,503);
+});
+test('内部エラーをHTTP 5xx件数に記録し、生の例外を返さない',async()=>{
+ const e=env();e.DB.sql.exec('DROP TABLE sources');const result=await request(e,'/api/ingest/sources');assert.equal(result.response.status,500);assert.equal(result.data.error.code,'internal_error');assert.equal((await request(e,'/api/admin/health','GET',undefined,true)).data.local_http_errors,1);
+});

@@ -1,3 +1,4 @@
+import { healthOverview, syncHealth, recordHttpFailure } from './health.mjs';
 import { billingOverview, importCursor, syncCloudflare } from './billing.mjs';
 import {publications,requestWithdrawal,withdrawalManifest,markWithdrawalBuild} from './withdrawals.mjs';
 import { allowedOrigin, submitFeedback, listFeedback } from './feedback.mjs';
@@ -102,13 +103,14 @@ const jobStatement = (
       'INSERT OR IGNORE INTO ai_jobs(id,entity_type,entity_id,content_hash,next_attempt_at,created_at) VALUES(?,?,?,?,?,?)',
     )
     .bind(crypto.randomUUID(), type, id, hash, time, time);
-app.onError((error: any, c) => {
+app.onError(async (error: any, c) => {
   const status = error instanceof ApiError ? error.status : 500;
   const code = error instanceof ApiError ? error.code : 'internal_error';
   if (status === 500)
     console.error(
       JSON.stringify({ event: 'request_failed', path: c.req.path }),
     );
+  if (status >= 500) await recordHttpFailure(c.env);
   return c.json(
     {
       error: {
@@ -234,6 +236,8 @@ for (const path of [
   '/api/admin/feedback/*',
   '/api/admin/editors',
   '/api/admin/editors/*',
+  '/api/admin/health',
+  '/api/admin/health/*',
   '/api/admin/billing',
   '/api/admin/billing/*',
   '/api/admin/operations',
@@ -874,6 +878,8 @@ app.post('/api/admin/jobs/:id/retry', async (c) => {
   if (!result.meta.changes) throw new ApiError(409, 'job_not_failed');
   return c.json({ state: 'queued' });
 });
+app.get('/api/admin/health', async (c) => c.json(await healthOverview(c.env)));
+app.post('/api/admin/health/sync', async (c) => c.json(await syncHealth(c.env)));
 app.get('/api/admin/billing', async (c) =>
   c.json(await billingOverview(c.env, c.req.query('month'))),
 );

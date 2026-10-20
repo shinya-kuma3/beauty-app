@@ -1,10 +1,12 @@
+import { healthMarkup } from './health-markup.mjs';
 import { billingMarkup } from './billing-markup.mjs';
 import {tagPickerMarkup} from '../src/lib/tag-picker-markup.mjs';
 export function adminPage() {
-  return `<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>編集ダッシュボード | my beauty palette</title><link rel="stylesheet" href="/admin-dashboard.css"><link rel="stylesheet" href="/tag-picker.css"><script src="/tag-picker.js" defer></script><script src="/admin-dashboard.js" defer></script><script src="/admin-feedback.js" defer></script><script src="/admin-publications.js" defer></script><script src="/admin-billing.js" defer></script></head><body>
+  return `<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>編集ダッシュボード | my beauty palette</title><link rel="stylesheet" href="/admin-dashboard.css"><link rel="stylesheet" href="/tag-picker.css"><script src="/tag-picker.js" defer></script><script src="/admin-dashboard.js" defer></script><script src="/admin-feedback.js" defer></script><script src="/admin-publications.js" defer></script><script src="/admin-billing.js" defer></script><script src="/admin-health.js" defer></script></head><body>
  <header><a href="/">my beauty <em>palette</em></a><div><span class="badge">編集ダッシュボード</span><p id="identity"></p></div></header>
  <main><div class="page-heading"><div><p class="eyebrow">EDITORIAL WORKSPACE</p><h1>美容の話題を、楽しく届ける。</h1><p>記事を読み、内容を整え、あなたの判断で公開する場所。</p></div><button id="refresh" class="secondary">一覧を更新</button></div>
  <p id="message" role="status" aria-live="polite"></p>
+ ${healthMarkup}
  ${billingMarkup}
  <details id="owner-tools" hidden><summary>収集・AI処理の管理</summary><div class="tools"><button id="discover">動画を探す</button><button id="process">待っているAI処理を進める</button></div><div id="operations"></div></details>
  <details id="team-tools" hidden><summary>編集者の管理</summary><p>編集者は記事の編集・AIチェック・公開・却下ができます。追加後、Cloudflare Accessの許可メールにも同じアドレスを追加してください。停止・削除したメールはログイン済みでも利用できません。停止後に削除できます。過去の審査履歴は残します。</p><form id="member-form" class="inline-form"><label for="member-email">編集者のメールアドレス<input id="member-email" type="email" required maxlength="254" autocomplete="off"></label><button type="submit">編集者を追加</button></form><div id="members"></div></details>
