@@ -64,6 +64,21 @@ for (const result of allMatches()) {
 // Exercise the scripts against the actual generated public page.
 const { Window } = await import('happy-dom');
 const { renderPublicMarkdown } = await import('../worker/core.mjs');
+for (const id of ['vitamin-c','booster']) {
+  const page = new Window({settings:{disableJavaScriptFileLoading:true,disableCSSFileLoading:true}});
+  try {
+    page.document.write(await readFile('dist/ingredients/' + id + '/index.html','utf8'));
+    const record = index.find(row => row.url.endsWith('/ingredients/' + id + '/'));
+    assert.ok(record, id + ': public search entry');
+    assert.equal(page.document.querySelector('h1').textContent, record.title);
+    assert.equal(page.document.querySelector('.sources'), null, id + ': no scientific reference panel');
+    if (id === 'booster') {
+      assert.equal(record.entryType, 'care-item');
+      assert.match(page.document.querySelector('.detail-meta').textContent, /ケアアイテム/);
+      assert.equal(page.document.querySelector('.detail-header .eyebrow').textContent, 'CARE ITEM NOTE');
+    }
+  } finally { await page.happyDOM.close(); }
+}
 const { parseSnapshot, digest } =
   await import('../shared/release-content.mjs');
 for (const folder of ['approved-articles', 'generated-articles']) {

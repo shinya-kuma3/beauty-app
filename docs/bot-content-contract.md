@@ -10,7 +10,7 @@
 - 初期記事: src/content/articles/<id>.json
 - 管理画面で承認された記事: src/content/approved-articles/<id>.json
 
-title、summary、category（skin/hair/nail/body）、tags、status（draft/published）、updatedAt、sectionsを持ちます。成分はenglishName・role・caution、記事はreadingMinutes・relatedIngredientsも使います。sourcesは任意の参考リンク配列で、空配列を許可します。Xだけ・YouTubeだけで公開でき、別の資料を要求しません。
+title、summary、category（skin/hair/nail/body）、tags、status（draft/published）、updatedAt、sectionsを持ちます。図鑑はenglishName・role・cautionを持ち、entryTypeはingredient（成分・既定）またはcare-item（導入液などのケアアイテム）で区分します。記事はreadingMinutes・relatedIngredientsも使います。sourcesは任意の参考リンク配列で、空配列を許可します。Xだけ・YouTubeだけで公開でき、別の資料を要求しません。
 
 sourcesのkindはx、youtube、reference、officialを使えます。旧guideline/researchは互換性のため読み込めますが、科学資料は公開ページに表示しません。URLはHTTPSです。discoveryUrlsは任意の収集元URLです。
 

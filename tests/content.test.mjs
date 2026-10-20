@@ -11,3 +11,5 @@ test('存在しない関連成分を拒否する', () => { const copy = structur
 test('存在しない日付を拒否する', () => { const copy = structuredClone(records); copy[0].data.updatedAt = '2026-02-30'; assert.ok(validateRecords(copy).some((e) => e.includes('実在する'))); });
 test('X・YouTubeのみ、参考リンクなしの記事や成分を公開できる', () => { for (const sources of [[],[{title:'投稿',url:'https://x.com/example/status/1',kind:'x'}],[{title:'動画',url:'https://www.youtube.com/watch?v=sample',kind:'youtube'}]]) { const copy=structuredClone(records); copy[0].data.sources=sources; assert.deepEqual(validateRecords(copy),[]); } });
 test('実行可能な出典 URL と任意 slug を拒否する', () => { const copy = structuredClone(records); copy[0].data.sources = [{title:'投稿',kind:'x',url:'javascript:alert(1)'}]; copy[0].data.slug = '../injected'; const errors = validateRecords(copy); assert.ok(errors.some((e) => e.includes('HTTPS'))); assert.ok(errors.some((e) => e.includes('slug'))); });
+
+test('図鑑のケアアイテム区分を検証し、誤った分類を拒否する',()=>{const copy=structuredClone(records);copy.find(r=>r.id==='booster').data.entryType='unknown';assert.ok(validateRecords(copy).some(e=>e.includes('entryType')));});

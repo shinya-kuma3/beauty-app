@@ -37,6 +37,7 @@ export function validateRecords(records) {
       if (!source.title || !['guideline', 'research', 'official', 'reference', 'x', 'youtube'].includes(source.kind)) fail('出典の title / kind を確認してください');
     }
     for (const url of data.discoveryUrls || []) { try { if (new URL(url).protocol !== 'https:') fail('discoveryUrls は HTTPS にしてください'); } catch { fail('discoveryUrls が不正です'); } }
+    if (collection === 'ingredients' && data.entryType !== undefined && !['ingredient', 'care-item'].includes(data.entryType)) fail('entryType は ingredient / care-item のいずれかです');
     if (collection === 'ingredients') for (const field of ['englishName', 'role', 'caution']) if (typeof data[field] !== 'string' || !data[field].trim()) fail(`${field} が必要です`);
     if (collection === 'articles') {
       if (!Number.isInteger(data.readingMinutes) || data.readingMinutes < 1) fail('readingMinutes は1以上の整数です');

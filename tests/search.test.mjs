@@ -14,3 +14,9 @@ test('共通成分は複数の部位から検索でき、対象外の部位に�
   for (const category of ['nail', 'skin', 'body']) assert.equal(filterEntries(shared, { category }).length, 1);
   assert.equal(filterEntries(shared, { category: 'hair' }).length, 0);
 });
+
+test('ビタミンCの表記ゆれと導入液の別名から新しい図鑑ページを検索できる',async()=>{
+ const {loadRecords}=await import('../scripts/validate-content.mjs');const records=(await loadRecords()).filter(r=>r.collection==='ingredients'&&r.data.status==='published').map(r=>({...r.data,id:r.id,type:'ingredient'}));
+ for(const query of ['ビタミンＣ','Vitamin C','アスコルビン酸'])assert.ok(filterEntries(records,{query}).some(r=>r.id==='vitamin-c'));
+ for(const query of ['導入液','導入美容液','ブースター','プレ化粧水'])assert.ok(filterEntries(records,{query,type:'ingredient',category:'skin'}).some(r=>r.id==='booster'&&r.entryType==='care-item'));
+});

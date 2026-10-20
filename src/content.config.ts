@@ -40,6 +40,7 @@ const ingredients = defineCollection({
   loader: glob({ pattern: '*.json', base: './src/content/ingredients' }),
   schema: z.object({
     ...common,
+    entryType: z.enum(['ingredient', 'care-item']).default('ingredient'),
     englishName: z.string().min(1),
     role: z.string().min(1),
     caution: z.string().min(1),
