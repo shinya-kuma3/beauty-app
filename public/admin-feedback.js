@@ -6,7 +6,8 @@
     total = 0,
     limit = 10,
     status = "new",
-    working = false;
+    working = false,
+    canManage = false;
   const el = (tag, text) => {
     const node = document.createElement(tag);
     node.textContent = text;
@@ -112,8 +113,10 @@
       card.className = "feedback-card";
       const header = el("div", "");
       header.className = "feedback-card-heading";
+      // Editors receive no name/email from the API; only admins can change or delete posts.
+      const contact = canManage && result.contact !== false;
       header.append(
-        el("h3", item.name || "名前の記入なし"),
+        el("h3", contact ? item.name || "名前の記入なし" : "読者からの投稿"),
         el(
           "span",
           new Date(item.created_at).toLocaleString("ja-JP") +
@@ -121,11 +124,19 @@
             (item.status === "new" ? "未確認" : "確認済み"),
         ),
       );
-      const email = el("p", "メール：" + (item.email || "記入なし"));
-      email.className = "feedback-email";
       const message = el("p", item.message);
       message.className = "feedback-body";
-      card.append(header, email, message);
+      card.append(header);
+      if (contact) {
+        const email = el("p", "メール：" + (item.email || "記入なし"));
+        email.className = "feedback-email";
+        card.append(email);
+      }
+      card.append(message);
+      if (!canManage) {
+        list.append(card);
+        continue;
+      }
       const controls = el("div", "");
       controls.className = "tools";
       const mark = el(
@@ -180,7 +191,8 @@
   fetch("/api/admin/me")
     .then((r) => (r.ok ? r.json() : null))
     .then((me) => {
-      if (me?.role === "admin") {
+      if (["admin", "editor"].includes(me?.role)) {
+        canManage = me.role === "admin";
         root.hidden = false;
         action(() => load());
       }

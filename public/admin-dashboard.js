@@ -623,7 +623,23 @@ async function openArticle(id) {
   $('articles')
     .querySelectorAll('button')
     .forEach((b) => b.classList.toggle('selected', b.dataset.id === id));
+  syncArticleUrl(id);
   updateActions();
+}
+// Keep /admin/articles/<id> in the address bar so an article can be reopened or shared with the team.
+function syncArticleUrl(id) {
+  if (window.BeautyAdminNav?.current?.() !== 'articles') return;
+  const path = '/admin/articles/' + encodeURIComponent(id);
+  if (location.pathname !== path) history.replaceState(null, '', path);
+}
+function articleFromPath() {
+  const match = /^\/admin\/articles\/([^/]+)$/.exec(location.pathname);
+  if (!match) return null;
+  try {
+    return decodeURIComponent(match[1]);
+  } catch {
+    return null;
+  }
 }
 async function switchPanel(name) {
   for (const b of document.querySelectorAll('[role="tab"]')) {
@@ -1299,6 +1315,14 @@ action(async () => {
   $('team-tools').hidden = identity.role !== 'admin';
   tagPicker = BeautyTagPicker.create($('admin-tags'));
   await refresh();
+  const linked = articleFromPath();
+  if (linked) {
+    try {
+      await openArticle(linked);
+    } catch {
+      return '指定された記事を開けませんでした。一覧から選んでください。';
+    }
+  }
   return '記事を選んで編集・確認を始めてください。';
 });
 
@@ -1307,6 +1331,7 @@ window.addEventListener('edit-publication',event=>{
  if(dirty&&!confirm('未保存の変更があります。公開記事の編集へ移動しますか？')) return;
  action(async()=>{
   const result=await api('publications/edit','POST',event.detail);
+  window.BeautyAdminNav?.go('/admin/articles/'+encodeURIComponent(result.id));
   dirty=false;$('article-filters').reset();tagPicker.setSelected([]);$('status').value='pending_review';previousStatus='pending_review';appliedFilters=new URLSearchParams({status:'pending_review',keyword_mode:'all'});
   await list();await openArticle(result.id);switchPanel('edit');$('detail').scrollIntoView?.({behavior:'smooth',block:'start'});
   return '編集できます。再公開が完了するまで、現在の公開記事はそのまま残ります。';

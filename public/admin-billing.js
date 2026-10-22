@@ -355,7 +355,10 @@
   fetch("/api/admin/me")
     .then((r) => (r.ok ? r.json() : null))
     .then((me) => {
-      if (me?.role === "admin") root.hidden = false;
+      if (me?.role === "admin") {
+        root.hidden = false;
+        if (root.open) action(load);
+      }
     })
     .catch(() => {});
 })();

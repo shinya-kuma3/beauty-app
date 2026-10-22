@@ -180,7 +180,7 @@ test("意見箱は検証前に送信できず、失敗時も入力を残して�
     await w.happyDOM.close();
   }
 });
-test("管理意見箱は編集者に表示せず、投稿本文をHTMLとして実行しない", async () => {
+test("意見箱は編集者に本文だけを表示し、確認・削除と個人情報は管理者だけ、本文をHTMLとして実行しない", async () => {
   for (const role of ["editor", "admin"]) {
     const w = win();
     try {
@@ -196,7 +196,7 @@ test("管理意見箱は編集者に表示せず、投稿本文をHTMLとして�
                 {
                   id: "one",
                   name: "<img src=x onerror=alert(1)>",
-                  email: null,
+                  email: "reader@example.test",
                   message: "<script>attack()</script>",
                   status: "new",
                   created_at: "2026-10-13T00:00:00Z",
@@ -208,12 +208,24 @@ test("管理意見箱は編集者に表示せず、投稿本文をHTMLとして�
       };
       w.eval(admin);
       await settle();
-      assert.equal(
-        w.document.getElementById("feedback-tools").hidden,
-        role !== "admin",
+      assert.equal(w.document.getElementById("feedback-tools").hidden, false);
+      assert.equal(w.document.querySelector("#feedback-list img"), null);
+      assert.match(
+        w.document.querySelector(".feedback-body").textContent,
+        /script/,
       );
-      if (role === "editor") assert.equal(calls.length, 1);
-      else {
+      if (role === "editor") {
+        const card = w.document.querySelector(".feedback-card");
+        assert.equal(card.querySelector("h3").textContent, "読者からの投稿");
+        assert.equal(card.querySelector(".feedback-email"), null);
+        assert.equal(card.querySelector("button"), null);
+        assert.doesNotMatch(card.textContent, /reader@example\.test/);
+      } else {
+        assert.match(
+          w.document.querySelector(".feedback-email").textContent,
+          /reader@example\.test/,
+        );
+        assert.ok(w.document.querySelector(".feedback-card .danger"));
         assert.equal(
           w.document.getElementById("feedback-unread").textContent,
           "1",

@@ -427,6 +427,53 @@ test('公開ページのプレビューは公開サイトと同じ表示規則�
     400,
   );
 });
+test('管理画面はページごとのURLで開け、編集者には管理者用のページとメニューを出さない', async () => {
+  const e = env();
+  e.DB.sql
+    .prepare(
+      'INSERT INTO editors(email,active,updated_at,added_by) VALUES(?,1,?,?)',
+    )
+    .run('editor@example.test', new Date().toISOString(), 'admin@example.test');
+  const open = (path, who) =>
+    app.request(
+      base + path,
+      who
+        ? {
+            headers: {
+              'Cf-Access-Jwt-Assertion': who === 'editor' ? editorToken : token,
+            },
+          }
+        : {},
+      e,
+    );
+  assert.equal((await open('/admin/articles')).status, 403);
+  for (const [path, page] of [
+    ['/admin', 'dashboard'],
+    ['/admin/articles', 'articles'],
+    ['/admin/articles/some-article-id', 'articles'],
+    ['/admin/feedback', 'feedback'],
+    ['/admin/team', 'team'],
+    ['/admin/usage', 'usage'],
+  ]) {
+    const response = await open(path, 'admin');
+    assert.equal(response.status, 200, path);
+    const html = await response.text();
+    assert.match(html, new RegExp('data-admin-page="' + page + '"'));
+    assert.doesNotMatch(html, /data-owner-only hidden/);
+    assert.equal(response.headers.get('X-Robots-Tag'), 'noindex, nofollow');
+  }
+  const unknown = await open('/admin/unknown', 'admin');
+  assert.equal(unknown.status, 302);
+  assert.equal(unknown.headers.get('Location'), '/admin');
+  for (const path of ['/admin/team', '/admin/usage', '/admin/ai']) {
+    const response = await open(path, 'editor');
+    assert.equal(response.status, 302, path);
+    assert.equal(response.headers.get('Location'), '/admin');
+  }
+  const feedback = await open('/admin/feedback', 'editor');
+  assert.equal(feedback.status, 200);
+  assert.match(await feedback.text(), /data-owner-only hidden/);
+});
 test('参考リンク・編集メモは任意、URL重複と不正な入力を拒否', async () => {
   const e = env(),
     s = await request(e, '/api/ingest/sources', 'POST', source);
@@ -1921,7 +1968,7 @@ test("意見箱の回数制限は共有DBで制御し、IPを平文保存しな�
     201,
   );
 });
-test("投稿の個人情報は管理者だけが確認・変更・削除できる", async () => {
+test("投稿の個人情報は管理者だけが確認・変更・削除でき、編集者は本文だけを読める", async () => {
   const e = feedbackEnv(),
     body = { ...submission(), name: "投稿者", email: "reader@example.test" };
   await sendFeedback(e, body);
@@ -1932,6 +1979,7 @@ test("投稿の個人情報は管理者だけが確認・変更・削除でき�
     .run("editor@example.test", new Date().toISOString(), "admin@example.test");
   for (const auth of [false, "editor"])
     for (const method of ["GET", "PATCH", "DELETE"]) {
+      if (auth === "editor" && method === "GET") continue;
       const result = await request(
         e,
         "/api/admin/feedback" + (method === "GET" ? "" : "/" + body.id),
@@ -1941,6 +1989,17 @@ test("投稿の個人情報は管理者だけが確認・変更・削除でき�
       );
       assert.equal(result.response.status, 403);
     }
+  const editorView = await request(e, "/api/admin/feedback", "GET", undefined, "editor");
+  assert.equal(editorView.response.status, 200);
+  assert.equal(editorView.data.contact, false);
+  assert.equal(editorView.data.items[0].message, body.message);
+  for (const field of ["name", "email", "reviewed_by"])
+    assert.equal(field in editorView.data.items[0], false);
+  assert.doesNotMatch(JSON.stringify(editorView.data), /reader@example\.test|投稿者/);
+  assert.equal(
+    e.DB.sql.prepare("SELECT status FROM feedback").get().status,
+    "new",
+  );
   const list = await request(e, "/api/admin/feedback", "GET", undefined, true);
   assert.equal(list.data.items[0].email, body.email);
   assert.equal(list.data.unread, 1);
