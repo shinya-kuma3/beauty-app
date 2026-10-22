@@ -138,7 +138,7 @@ export async function submitFeedback(env, input, origin, ip) {
     throw new ApiError(409, "feedback_id_conflict");
   return { ok: true };
 }
-export async function listFeedback(db, query) {
+export async function listFeedback(db, query, { contact = true } = {}) {
   const status = query.status || "new";
   if (!["new", "read", "all"].includes(status))
     throw new ApiError(400, "invalid_status");
@@ -171,7 +171,16 @@ export async function listFeedback(db, query) {
     .prepare("SELECT count(*) AS n FROM feedback WHERE status='new'")
     .first();
   return {
-    items: items.results,
+    // Editors see the message only; name, email and reviewer stay with admins.
+    items: contact
+      ? items.results
+      : items.results.map(({ id, message, status, created_at }) => ({
+          id,
+          message,
+          status,
+          created_at,
+        })),
+    contact,
     total: total.n,
     unread: unread.n,
     limit,

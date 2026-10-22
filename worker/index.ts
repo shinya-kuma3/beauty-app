@@ -3,6 +3,7 @@ import { healthOverview, syncHealth, recordHttpFailure } from './health.mjs';
 import { billingOverview, importCursor, syncCloudflare } from './billing.mjs';
 import {publications,requestWithdrawal,withdrawalManifest,markWithdrawalBuild} from './withdrawals.mjs';
 import { allowedOrigin, submitFeedback, listFeedback } from './feedback.mjs';
+import { siteAnalytics, pageAnalytics } from './analytics.mjs';
 import {
   approvedFiles,
   requestRelease,
@@ -235,9 +236,8 @@ const ownersOnly = async (c: any, next: any) => {
     throw new ApiError(403, 'owner_required');
   await next();
 };
+// Feedback is readable by editors without contact details; changes stay owner-only (checked per route).
 for (const path of [
-  '/api/admin/feedback',
-  '/api/admin/feedback/*',
   '/api/admin/editors',
   '/api/admin/editors/*',
   '/api/admin/health',
@@ -253,9 +253,14 @@ for (const path of [
 ])
   app.use(path, ownersOnly);
 app.get("/api/admin/feedback", async (c) =>
-  c.json(await listFeedback(c.env.DB, c.req.query())),
+  c.json(
+    await listFeedback(c.env.DB, c.req.query(), {
+      contact: c.get("role") === "admin",
+    }),
+  ),
 );
 app.patch("/api/admin/feedback/:id", async (c) => {
+  if (c.get("role") !== "admin") throw new ApiError(403, "owner_required");
   const input = await json(c, 1000);
   if (
     !["new", "read"].includes(input.status) ||
@@ -276,6 +281,7 @@ app.patch("/api/admin/feedback/:id", async (c) => {
   return c.json({ ok: true });
 });
 app.delete("/api/admin/feedback/:id", async (c) => {
+  if (c.get("role") !== "admin") throw new ApiError(403, "owner_required");
   const result = await c.env.DB.prepare("DELETE FROM feedback WHERE id=?")
     .bind(c.req.param("id"))
     .run();
@@ -285,6 +291,12 @@ app.delete("/api/admin/feedback/:id", async (c) => {
 app.post('/api/admin/publications/edit',async(c)=>c.json(await editPublication(c.env,await json(c,5000),c.get('admin'))));
 app.get('/api/admin/publications',async(c)=>c.json(await publications(c.env,c.req.query())));
 app.post('/api/admin/publications/withdraw',async(c)=>c.json(await requestWithdrawal(c.env,await json(c,5000),c.get('admin')),201));
+app.get('/api/admin/analytics', async (c) =>
+  c.json(await siteAnalytics(c.env, c.req.query(), c.get('role'))),
+);
+app.get('/api/admin/analytics/pages', async (c) =>
+  c.json(await pageAnalytics(c.env, c.req.query(), c.get('role'))),
+);
 app.get('/api/admin/me', (c) =>
   c.json({ email: c.get('admin'), role: c.get('role') }),
 );
@@ -403,16 +415,29 @@ app.post('/api/admin/public-preview', async (c) => {
   });
 });
 
-app.get('/admin', (c) => {
+const adminPages = ['articles', 'publications', 'feedback', 'ai', 'usage', 'team'];
+const ownerPages = ['ai', 'usage', 'team'];
+function renderAdmin(c: any, page: string) {
+  // Editors never receive the markup of owner-only pages; their APIs are also owner-only.
+  if (ownerPages.includes(page) && c.get('role') !== 'admin')
+    return c.redirect('/admin', 302);
   c.header('Cache-Control', 'no-store');
   c.header(
     'Content-Security-Policy',
     "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",
   );
   c.header('X-Robots-Tag', 'noindex, nofollow');
-  return c.html(adminPage());
-});
+  return c.html(adminPage({ page, role: c.get('role') }));
+}
+app.get('/admin', (c) => renderAdmin(c, 'dashboard'));
 app.get('/admin/', (c) => c.redirect('/admin', 302));
+app.get('/admin/articles/:id', (c) => renderAdmin(c, 'articles'));
+app.get('/admin/:page', (c) => {
+  const page = c.req.param('page');
+  return adminPages.includes(page)
+    ? renderAdmin(c, page)
+    : c.redirect('/admin', 302);
+});
 app.get('/api/ingest/health', (c) =>
   c.json({ environment: c.env.PIPELINE_ENV }),
 );

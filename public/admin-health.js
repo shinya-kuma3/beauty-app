@@ -335,6 +335,8 @@
       if (me?.role === "admin") {
         authorized = true;
         root.hidden = false;
+        // The dashboard opens this panel before the role is known.
+        if (root.open) load();
       }
     })
     .catch(() => {});
