@@ -566,3 +566,60 @@ test('修正案は読み込んだ記事だけに使え、記事を切り替え�
     await s.window.happyDOM.close();
   }
 });
+test('公開の準備に条件と理由を表示し、要約・タグの処理後も確認のチェックを残す', async () => {
+  const s = await setup('editor', [], [{ ...row, ai_status: 'queued' }]);
+  try {
+    s.$('articles').querySelector('button').click();
+    await settle();
+    const list = s.$('publish-checklist');
+    assert.match(list.textContent, /要約・タグ/);
+    assert.match(s.$('publish-reason').textContent, /まだ公開できません/);
+    assert.equal(s.$('publish').disabled, true);
+    s.$('confirm').checked = true;
+    s.$('confirm').dispatchEvent(new s.window.Event('change'));
+    assert.match(list.textContent, /内容の確認済み/);
+    list.querySelector('[data-checklist-action="enrich"]').click();
+    await settle();
+    assert.ok(
+      s.calls.some(
+        (c) => c.path === 'articles/test-article/ai-run' && c.body.kind === 'enrich',
+      ),
+    );
+    assert.equal(s.$('confirm').checked, true);
+    const body = s.$('editor').elements.body_markdown;
+    body.value = '変更した本文です。';
+    body.dispatchEvent(new s.window.Event('input'));
+    assert.ok(list.querySelector('[data-checklist-action="save"]'));
+    assert.equal(list.querySelector('[data-checklist-action="enrich"]').disabled, true);
+    assert.match(s.$('publish-reason').textContent, /保存されていない変更/);
+    assert.equal(s.$('confirm').checked, false);
+  } finally {
+    await s.window.happyDOM.close();
+  }
+});
+test('条件がそろうと公開でき、公開済みの記事には改訂の案内を出し、一覧を隠して広く編集できる', async () => {
+  const s = await setup('editor', [], [row, { ...row, id: 'done', title: '公開済みの記事', status: 'published' }]);
+  try {
+    const items = () => [...s.$('articles').querySelectorAll('.article-item')];
+    items()[0].click();
+    await settle();
+    s.$('confirm').checked = true;
+    s.$('confirm').dispatchEvent(new s.window.Event('change'));
+    assert.equal(s.$('publish').disabled, false);
+    assert.match(s.$('publish-reason').textContent, /公開の準備ができました/);
+    assert.equal(s.$('publish-checklist').querySelectorAll('.done').length, 3);
+    items()[1].click();
+    await settle();
+    assert.equal(s.$('review-actions').hidden, true);
+    assert.equal(s.$('published-note').hidden, false);
+    assert.match(s.$('published-note').textContent, /この記事を編集する/);
+    assert.equal(s.$('publish-checklist').hidden, true);
+    s.$('toggle-list').click();
+    assert.equal(s.window.document.querySelector('.workspace').classList.contains('list-collapsed'), true);
+    assert.equal(s.$('toggle-list').getAttribute('aria-pressed'), 'true');
+    s.$('toggle-list').click();
+    assert.equal(s.window.document.querySelector('.workspace').classList.contains('list-collapsed'), false);
+  } finally {
+    await s.window.happyDOM.close();
+  }
+});

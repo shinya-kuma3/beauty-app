@@ -154,6 +154,87 @@ function updateActions() {
   $('save-state').classList.toggle('unsaved', dirty);
   $('revision-label').textContent =
     '版 ' + current.revision + ' ・ ' + date(current.updated_at);
+  renderChecklist(editable);
+}
+const aiReasons = {
+  queued: '要約・タグの処理がまだです。下の「要約・タグを処理」を押してください。',
+  waiting: '要約・タグの処理がまだです。下の「要約・タグを処理」を押してください。',
+  processing: '要約・タグを処理しています。少し待ってから「一覧を更新」を押してください。',
+  deferred:
+    'Geminiの利用上限のため、要約・タグの処理が延期されています。日本時間9時以降にもう一度「要約・タグを処理」を押してください。',
+  failed: '要約・タグの処理に失敗しました。もう一度「要約・タグを処理」を押してください。',
+};
+// Shows each publishing condition with its state, so a disabled button always has a visible reason.
+function renderChecklist(editable) {
+  const listEl = $('publish-checklist');
+  $('published-note').hidden = editable;
+  listEl.hidden = !editable;
+  if (!editable) {
+    $('published-note').textContent =
+      current.status === 'published'
+        ? '公開承認済みの記事です。修正するには、上の「この記事を編集する」で改訂版を作ってください。'
+        : '却下された記事です。この画面からは公開できません。';
+    $('publish-reason').textContent = '';
+    return;
+  }
+  const aiDone = current.ai_status === 'complete';
+  const items = [
+    {
+      done: !dirty,
+      title: dirty ? '保存されていない変更があります' : '内容を保存済み',
+      action: dirty ? ['save', '修正を保存'] : null,
+    },
+    {
+      done: aiDone,
+      title: aiDone
+        ? '要約・タグの処理済み'
+        : '要約・タグ：' + (states[current.ai_status] || '未処理'),
+      note: aiDone ? '' : aiReasons[current.ai_status] || aiReasons.queued,
+      action:
+        aiDone || current.ai_status === 'processing'
+          ? null
+          : ['enrich', '要約・タグを処理'],
+      blockedBy: dirty ? '先に修正を保存してください。' : '',
+    },
+    {
+      done: $('confirm').checked,
+      title: $('confirm').checked ? '内容の確認済み' : '内容を確認してチェックを入れる',
+      note: $('confirm').checked ? '' : 'プレビューで公開ページの見た目も確認できます。',
+    },
+  ];
+  listEl.replaceChildren(
+    ...items.map((item) => {
+      const li = el('li', undefined, item.done ? 'done' : 'todo');
+      li.append(el('span', item.done ? '✓' : '!', 'check-mark'));
+      const body = el('div');
+      body.append(el('strong', item.title));
+      if (item.note) body.append(el('span', item.note, 'check-note'));
+      if (item.action) {
+        const button = el('button', item.action[1], 'secondary');
+        button.type = 'button';
+        button.dataset.checklistAction = item.action[0];
+        button.disabled = busy || (item.action[0] === 'enrich' && dirty);
+        button.onclick = () =>
+          item.action[0] === 'save' ? submitEditor() : runEnrich();
+        body.append(button);
+        if (item.blockedBy && button.disabled)
+          body.append(el('span', item.blockedBy, 'check-note'));
+      }
+      li.append(body);
+      return li;
+    }),
+  );
+  const ready = items.every((item) => item.done);
+  $('publish-reason').textContent = ready
+    ? '公開の準備ができました。'
+    : 'まだ公開できません：' +
+      items.filter((item) => !item.done).map((item) => item.title).join('、');
+  $('publish-reason').classList.toggle('ready', ready);
+}
+function submitEditor() {
+  const form = $('editor');
+  if (form.requestSubmit) form.requestSubmit();
+  else form.dispatchEvent(new Event('submit', { cancelable: true }));
 }
 function markDirty() {
   dirty = true;
@@ -506,9 +587,15 @@ function renderSummary() {
 }
 async function openArticle(id) {
   const data = await api('articles/' + encodeURIComponent(id));
+  // Reloading the same saved version (e.g. after AI processing) keeps the editor's confirmation.
+  const keepConfirm =
+    !dirty &&
+    $('confirm').checked &&
+    current?.id === data.article.id &&
+    current?.revision === data.article.revision;
   current = data.article;
   dirty = false;
-  $('confirm').checked = false;
+  $('confirm').checked = keepConfirm;
   $('detail').hidden = false;
   $('empty-detail').hidden = true;
   $('detail-title').textContent = current.title;
@@ -924,8 +1011,8 @@ $('related').onclick = () =>
         ),
       );
   });
-$('ai-enrich').onclick = () =>
-  action(async () => {
+function runEnrich() {
+  return action(async () => {
     const result = await api(
       'articles/' + current.id + '/ai-run',
       'POST',
@@ -938,6 +1025,8 @@ $('ai-enrich').onclick = () =>
     await openArticle(current.id);
     return jobMessage(result);
   });
+}
+$('ai-enrich').onclick = runEnrich;
 $('discover').onclick = () =>
   action(async () => {
     const result = await api('youtube/discover', 'POST');
@@ -1302,6 +1391,19 @@ $('manual-proposal-clear').onclick = () => {
   resetManualProposal();
   $('manual-proposal-message').textContent = '読み込みを取り消しました。';
 };
+function setListCollapsed(collapsed) {
+  document.querySelector('.workspace').classList.toggle('list-collapsed', collapsed);
+  $('toggle-list').setAttribute('aria-pressed', String(collapsed));
+  $('toggle-list').textContent = collapsed ? '一覧を表示' : '一覧を隠す';
+  try {
+    localStorage.setItem('admin-list-collapsed', collapsed ? '1' : '0');
+  } catch {}
+}
+$('toggle-list').onclick = () =>
+  setListCollapsed(!document.querySelector('.workspace').classList.contains('list-collapsed'));
+try {
+  if (localStorage.getItem('admin-list-collapsed') === '1') setListCollapsed(true);
+} catch {}
 window.addEventListener('beforeunload', (e) => {
   if (dirty) e.preventDefault();
 });
