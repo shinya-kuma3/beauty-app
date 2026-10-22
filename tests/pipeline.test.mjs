@@ -2045,7 +2045,7 @@ test('X・YouTubeだけでも参考リンクなしでも、人の承認後に公
 test('Grokチェックは論文確認メモと参考URLを省略して返信できる',async()=>{
  const e=env(),id=await submitted(e),queued=await checkRequest(e,id);
  const list=(await request(e,'/api/ingest/checks?status=pending')).data;
- assert.match(list.requests[0].instructions,/掲載条件ではなく/);
+ assert.match(list.requests[0].instructions,/掲載条件ではなく/);assert.match(list.requests[0].instructions,/黄色いマーカー/);
  const result=await request(e,'/api/ingest/checks/'+queued.id+'/result','POST',{revision:list.requests[0].revision,overview:'読みやすさと表記を確認しました。',findings:[],questions:[],pr_notes:'紹介元のPR表示は未確認です。',terms:[]});
  assert.equal(result.response.status,200);
  const row=e.DB.sql.prepare('SELECT status FROM articles WHERE id=?').get(id);assert.equal(row.status,'pending_review');
