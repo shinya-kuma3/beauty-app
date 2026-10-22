@@ -204,6 +204,17 @@ test('未保存の本文を確認でき、競合で入力を失わず、未保�
     assert.match(page.textContent, /スキンケア/);
     assert.match(page.textContent, /公開用の本文/);
     assert.match(page.textContent, /参考にした投稿・動画/);
+    assert.equal(page.querySelector('header'), null);
+    const accordion = page.querySelector('.pp-sources details, details.pp-sources-accordion');
+    assert.ok(accordion);
+    assert.equal(accordion.hasAttribute('open'), false);
+    assert.match(accordion.querySelector('summary').textContent, /1件/);
+    assert.match(accordion.textContent, /リンク先を表示できない場合があります/);
+    const article = page.querySelector('.public-preview-article');
+    const order = [...article.children].map((child) => child.className);
+    assert.equal(order.at(-1), 'pp-note');
+    assert.ok(order.indexOf('pp-sources') < order.indexOf('pp-note'));
+    assert.ok(order.indexOf('pp-body') < order.indexOf('pp-sources'));
     assert.match(page.textContent, /1件は、論文・医学資料/);
     page.querySelectorAll('a').forEach((a) => assert.equal(a.target, '_blank'));
     s.$('article-preview-close').click();

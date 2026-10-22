@@ -1028,7 +1028,8 @@ async function openPublicPreview() {
     citations: values.citations,
   });
   const page = el('article', undefined, 'public-preview-article');
-  const header = el('header', undefined, 'pp-header');
+  // A div, not <header>: the admin stylesheet lays out every <header> as the page bar.
+  const header = el('div', undefined, 'pp-header');
   const meta = el('div', undefined, 'pp-meta');
   const published = current.status === 'published' && !dirty;
   meta.append(
@@ -1064,9 +1065,15 @@ async function openPublicPreview() {
     a.target = '_blank';
     a.rel = 'noopener noreferrer';
   });
-  page.append(header, note, body);
+  page.append(header, body);
   if (data.references.length) {
     const sources = el('aside', undefined, 'pp-sources');
+    const accordion = el('details', undefined, 'pp-sources-accordion');
+    const summary = el('summary');
+    summary.append(
+      el('h2', '参考にした投稿・動画'),
+      el('span', data.references.length + '件', 'pp-sources-count'),
+    );
     const list = el('ul');
     for (const source of data.references) {
       const li = el('li'),
@@ -1077,7 +1084,16 @@ async function openPublicPreview() {
       li.append(a, el('small', '参考にした情報 · 外部サイトを開きます'));
       list.append(li);
     }
-    sources.append(el('h2', '参考にした投稿・動画'), list);
+    accordion.append(
+      summary,
+      list,
+      el(
+        'p',
+        '※ 投稿・動画は、投稿者による削除や非公開への変更などにより、リンク先を表示できない場合があります。',
+        'pp-sources-caution',
+      ),
+    );
+    sources.append(accordion);
     page.append(sources);
   }
   if (data.hidden_references)
@@ -1090,6 +1106,7 @@ async function openPublicPreview() {
         'hint pp-hidden',
       ),
     );
+  page.append(note);
   $('article-preview-page').replaceChildren(page);
   $('article-preview-note').textContent = dirty
     ? '未保存の変更を含むプレビューです。公開する前に「修正を保存」を押してください。'
