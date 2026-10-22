@@ -53,13 +53,18 @@
   }
   window.BeautyArticleDiff = {
     changes,
-    render(document, before, after) {
+    render(
+      document,
+      before,
+      after,
+      titles = ["現在の記事本文", "Grokの修正案"],
+    ) {
       const grid = document.createElement("div");
       grid.className = "proposal-comparison";
       const entries = changes(before, after);
       for (const [title, excluded] of [
-        ["現在の記事本文", "added"],
-        ["Grokの修正案", "removed"],
+        [titles[0], "added"],
+        [titles[1], "removed"],
       ]) {
         const column = document.createElement("section"),
           heading = document.createElement("h4"),

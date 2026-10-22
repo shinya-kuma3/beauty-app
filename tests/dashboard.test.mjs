@@ -94,6 +94,15 @@ async function setup(role = 'editor', members = [], articles = [row]) {
       });
     if (path === 'preview')
       return Response.json({ preview_html: '<p>未保存の本文</p>' });
+    if (path === 'public-preview')
+      return Response.json({
+        body_html: '<p>公開用の本文</p><p><a href="https://x.com/a">Xの投稿</a></p>',
+        references: [
+          { title: 'x.com', url: 'https://x.com/a', kind: 'reference' },
+        ],
+        hidden_references: 1,
+        reading_minutes: 1,
+      });
     if (path === 'operations')
       return Response.json({
         settings: { dailyCalls: 30, dailyTokens: 600000 },
@@ -181,9 +190,24 @@ test('未保存の本文を確認でき、競合で入力を失わず、未保�
     s.$('confirm').dispatchEvent(new s.window.Event('change'));
     assert.equal(s.$('publish').disabled, true);
     assert.equal(s.$('ai-check').disabled, true);
-    s.$('tab-preview').click();
+    assert.equal(s.$('tab-preview'), null);
+    s.$('open-preview').click();
     await settle();
-    assert.match(s.$('preview').textContent, /未保存/);
+    const previewCall = s.calls.find((c) => c.path === 'public-preview');
+    assert.equal(previewCall.body.body_markdown, '未保存の本文');
+    assert.deepEqual(previewCall.body.citations, ['https://example.org/paper']);
+    assert.equal(s.$('article-preview-dialog').open, true);
+    assert.match(s.$('article-preview-note').textContent, /未保存/);
+    const page = s.$('article-preview-page');
+    assert.match(page.querySelector('h1').textContent, /保湿のケア/);
+    assert.match(page.textContent, /紹介文/);
+    assert.match(page.textContent, /スキンケア/);
+    assert.match(page.textContent, /公開用の本文/);
+    assert.match(page.textContent, /参考にした投稿・動画/);
+    assert.match(page.textContent, /1件は、論文・医学資料/);
+    page.querySelectorAll('a').forEach((a) => assert.equal(a.target, '_blank'));
+    s.$('article-preview-close').click();
+    assert.equal(s.$('article-preview-dialog').open, false);
     assert.equal(
       s.calls.some((c) => c.method === 'PATCH'),
       false,
@@ -444,4 +468,90 @@ test('Grok修正案は原文と並べて安全に表示し、採用先を個別�
   const call=s.calls.find(call=>call.path==='articles/'+row.id+'/checks/proposal-1/decision');assert.ok(call);assert.equal(call.body.decision,'accepted');assert.equal(call.body.revision,row.revision);
   assert.equal(s.calls.some(call=>call.path.endsWith('/review')),false);
  }finally{await s.window.happyDOM.close();}
+});
+
+test('受け取った修正案を公開予定の本文と左右で比較し、採用しても保存まで記事を変更しない', async () => {
+  const s = await setup('editor', [], [
+    row,
+    { ...row, id: 'other', title: '別の記事', body_markdown: '別の記事の本文です。' },
+  ]);
+  try {
+    s.$('articles').querySelector('button').click();
+    await settle();
+    s.$('tab-ai').click();
+    await settle();
+    s.$('manual-proposal-text').value = '短い';
+    s.$('manual-proposal-compare').click();
+    await settle();
+    assert.match(s.$('message').textContent, /短すぎます/);
+    assert.equal(s.$('manual-proposal-result').children.length, 0);
+    s.$('manual-proposal-text').value =
+      '# 保湿のケア\r\n論文の紹介を外し、使い心地と選び方を中心にまとめ直した新しい本文です。\r\n<script>alert(1)</script>';
+    s.$('manual-proposal-compare').click();
+    await settle();
+    const result = s.$('manual-proposal-result');
+    assert.match(result.textContent, /公開予定の本文/);
+    assert.match(result.textContent, /読み込んだ修正案/);
+    assert.equal(result.querySelector('script'), null);
+    const added = [...result.querySelectorAll('.diff-added')].map((line) => line.textContent);
+    assert.ok(added.some((line) => /新しい本文/.test(line)));
+    assert.ok(added.some((line) => /^\+ # 保湿のケア/.test(line)));
+    assert.match(result.querySelector('.diff-removed').textContent, /保存済み/);
+    assert.ok(!result.textContent.includes('\r'));
+    assert.match(result.textContent, /タイトル（# 〜）/);
+    assert.equal(s.$('editor').elements.body_markdown.value, '保存済みの本文です。');
+    result.querySelector('[data-manual-decision="accepted"]').click();
+    await settle();
+    const body = s.$('editor').elements.body_markdown.value;
+    assert.match(body, /^# 保湿のケア\n論文の紹介を外し/);
+    assert.equal(s.$('panel-edit').hidden, false);
+    assert.match(s.$('save-state').textContent, /未保存/);
+    assert.equal(s.$('publish').disabled, true);
+    assert.equal(s.$('manual-proposal-result').children.length, 0);
+    assert.equal(
+      s.calls.some(
+        (c) =>
+          c.method === 'PATCH' ||
+          c.path.includes('/decision') ||
+          c.path.endsWith('/review'),
+      ),
+      false,
+    );
+  } finally {
+    await s.window.happyDOM.close();
+  }
+});
+test('修正案は読み込んだ記事だけに使え、記事を切り替えると比較を取り消す', async () => {
+  const s = await setup('editor', [], [
+    row,
+    { ...row, id: 'other', title: '別の記事', body_markdown: '別の記事の本文です。' },
+  ]);
+  try {
+    const items = () => [...s.$('articles').querySelectorAll('.article-item')];
+    items()[0].click();
+    await settle();
+    s.$('manual-proposal-text').value =
+      'もう一つの記事に使ってはいけない、保湿のケアの記事だけに向けて用意した修正案の本文です。比較の表示を確認します。';
+    s.$('manual-proposal-compare').click();
+    await settle();
+    assert.ok(s.$('manual-proposal-result').querySelector('.proposal-comparison'));
+    items()[1].click();
+    await settle();
+    assert.equal(s.$('manual-proposal-result').children.length, 0);
+    assert.equal(s.$('manual-proposal-text').value, '');
+    assert.equal(s.$('editor').elements.body_markdown.value, '別の記事の本文です。');
+    s.$('manual-proposal-text').value =
+      '別の記事のために用意した、見送る予定の修正案の本文です。内容は採用せず、現在の本文をそのまま残します。';
+    s.$('manual-proposal-compare').click();
+    await settle();
+    s.$('manual-proposal-result')
+      .querySelector('[data-manual-decision="declined"]')
+      .click();
+    await settle();
+    assert.equal(s.$('manual-proposal-result').children.length, 0);
+    assert.equal(s.$('editor').elements.body_markdown.value, '別の記事の本文です。');
+    assert.match(s.$('manual-proposal-message').textContent, /変更していません/);
+  } finally {
+    await s.window.happyDOM.close();
+  }
 });

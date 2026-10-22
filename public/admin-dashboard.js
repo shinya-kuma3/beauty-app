@@ -1,5 +1,7 @@
 const $ = (id) => document.getElementById(id);
 let currentCheck = null;
+// A proposal read from a file or pasted text; it never leaves the browser until the editor saves.
+let manualProposal = null;
 let current = null,
   nextCursor = null,
   total = 0,
@@ -134,6 +136,11 @@ function updateActions() {
     dirty;
   $('reject').disabled =
     busy || !editable || !$('confirm').checked || dirty;
+  $('open-preview').disabled = busy;
+  document.querySelectorAll('[data-manual-decision]').forEach((button) => {
+    button.disabled =
+      busy || (button.dataset.manualDecision === 'accepted' && !editable);
+  });
   const applyTags = $('apply-ai-tags');
   if (applyTags) applyTags.disabled = busy || !editable;
   $('review-actions').hidden = !editable;
@@ -519,8 +526,9 @@ async function openArticle(id) {
     $('editor').elements[name].value = current[name];
   $('editor').elements.tags.value = current.tags.join(', ');
   $('editor').elements.citations.value = current.citations.join('\n');
-  $('preview').innerHTML = data.preview_html;
-  $('preview-note').textContent = '保存済みの本文です。';
+  if (manualProposal && manualProposal.articleId !== current.id)
+    resetManualProposal();
+  else renderManualProposal();
   renderCheck(data.check);
   renderSummary();
   $('flags').replaceChildren(
@@ -624,16 +632,7 @@ async function switchPanel(name) {
     b.tabIndex = active ? 0 : -1;
     $('panel-' + b.dataset.panel).hidden = !active;
   }
-  if (name === 'preview' && current && dirty) {
-    await action(async () => {
-      const data = await api('preview', 'POST', {
-        body_markdown: $('editor').elements.body_markdown.value,
-      });
-      $('preview').innerHTML = data.preview_html;
-      $('preview-note').textContent =
-        '未保存の本文のプレビューです。保存はまだしていません。';
-    });
-  }
+  if (name === 'ai') renderManualProposal();
 }
 async function members() {
   const data = await api('editors');
@@ -993,6 +992,282 @@ $('member-form').onsubmit = (e) => {
     await members();
     return '編集者を追加しました。Cloudflare AccessのAllowポリシーにも同じメールを追加してください。';
   });
+};
+const categoryLabels = {
+  skin: 'スキンケア',
+  hair: 'ヘアケア',
+  nail: '爪ケア',
+  body: 'ボディケア',
+};
+const tokyoDate = (value = new Date()) =>
+  new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Tokyo' })
+    .format(value)
+    .replaceAll('-', '.');
+function editorValues() {
+  const f = $('editor').elements;
+  return {
+    title: f.title.value.trim(),
+    excerpt: f.excerpt.value.trim(),
+    category: f.category.value,
+    tags: f.tags.value
+      .split(/[,、]/)
+      .map((s) => s.trim())
+      .filter(Boolean),
+    citations: f.citations.value
+      .split('\n')
+      .map((s) => s.trim())
+      .filter(Boolean),
+    body_markdown: f.body_markdown.value,
+  };
+}
+async function openPublicPreview() {
+  if (!current) return;
+  const values = editorValues();
+  const data = await api('public-preview', 'POST', {
+    body_markdown: values.body_markdown,
+    citations: values.citations,
+  });
+  const page = el('article', undefined, 'public-preview-article');
+  const header = el('header', undefined, 'pp-header');
+  const meta = el('div', undefined, 'pp-meta');
+  const published = current.status === 'published' && !dirty;
+  meta.append(
+    el('span', categoryLabels[values.category] || ''),
+    el('span', data.reading_minutes + '分で読む'),
+    el(
+      'span',
+      '更新日：' +
+        (published
+          ? (current.display_updated_at || current.updated_at || '')
+              .slice(0, 10)
+              .replaceAll('-', '.')
+          : tokyoDate() + '（公開を承認した日になります）'),
+    ),
+  );
+  const tags = el('div', undefined, 'pp-tags');
+  for (const tag of values.tags) tags.append(el('span', '# ' + tag));
+  header.append(
+    el('p', 'CARE JOURNAL', 'pp-eyebrow'),
+    el('h1', values.title || '（タイトル未入力）'),
+    meta,
+    el('p', values.excerpt || '（紹介文未入力）', 'pp-excerpt'),
+    tags,
+  );
+  const note = el('aside', undefined, 'pp-note');
+  note.append(
+    el('p', 'この記事はAIの補助を使って作成し、編集者が内容を確認しています。'),
+  );
+  const body = el('div', undefined, 'pp-body');
+  // body_html comes from the server-side public renderer (html disabled, safe links only).
+  body.innerHTML = data.body_html;
+  body.querySelectorAll('a').forEach((a) => {
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+  });
+  page.append(header, note, body);
+  if (data.references.length) {
+    const sources = el('aside', undefined, 'pp-sources');
+    const list = el('ul');
+    for (const source of data.references) {
+      const li = el('li'),
+        a = el('a', source.title + ' ↗');
+      a.href = source.url;
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      li.append(a, el('small', '参考にした情報 · 外部サイトを開きます'));
+      list.append(li);
+    }
+    sources.append(el('h2', '参考にした投稿・動画'), list);
+    page.append(sources);
+  }
+  if (data.hidden_references)
+    page.append(
+      el(
+        'p',
+        '参考URLのうち' +
+          data.hidden_references +
+          '件は、論文・医学資料などのため公開サイトには表示されません。',
+        'hint pp-hidden',
+      ),
+    );
+  $('article-preview-page').replaceChildren(page);
+  $('article-preview-note').textContent = dirty
+    ? '未保存の変更を含むプレビューです。公開する前に「修正を保存」を押してください。'
+    : current.status === 'pending_review'
+      ? '保存済みの内容です。公開を承認すると、この内容でサイトに表示されます。'
+      : '保存済みの内容です。';
+  const dialog = $('article-preview-dialog');
+  if (!dialog.open) dialog.showModal();
+  $('article-preview-close').focus();
+  return 'プレビューを表示しました。';
+}
+$('open-preview').onclick = () => action(openPublicPreview);
+$('article-preview-close').onclick = () => $('article-preview-dialog').close();
+$('article-preview-dialog').addEventListener('click', (event) => {
+  if (event.target === $('article-preview-dialog'))
+    $('article-preview-dialog').close();
+});
+
+function resetManualProposal() {
+  manualProposal = null;
+  $('manual-proposal-file').value = '';
+  $('manual-proposal-text').value = '';
+  $('manual-proposal-result').replaceChildren();
+}
+function normalizeProposal(text) {
+  return text.replace(/^﻿/, '').replace(/\r\n?/g, '\n');
+}
+async function readProposalFile(file) {
+  if (!/\.(md|markdown|txt)$/i.test(file.name))
+    throw new Error('.md または .txt のファイルを選んでください。');
+  if (file.size > 400000)
+    throw new Error('ファイルが大きすぎます。本文は50,000文字までです。');
+  const buffer = await file.arrayBuffer();
+  try {
+    return new TextDecoder('utf-8', { fatal: true }).decode(buffer);
+  } catch {
+    throw new Error(
+      '文字を読み取れませんでした。UTF-8で保存したファイルを選んでください。',
+    );
+  }
+}
+function renderManualProposal() {
+  const root = $('manual-proposal-result');
+  root.replaceChildren();
+  if (!manualProposal || !current || manualProposal.articleId !== current.id)
+    return;
+  const before = $('editor').elements.body_markdown.value;
+  manualProposal.before = before;
+  root.append(
+    el(
+      'p',
+      '読み込んだ内容：' +
+        manualProposal.label +
+        '（' +
+        manualProposal.text.length.toLocaleString() +
+        '文字）',
+      'hint',
+    ),
+  );
+  if (before === manualProposal.text) {
+    root.append(
+      el('p', '公開予定の本文と同じ内容です。変更はありません。', 'hint'),
+    );
+    return;
+  }
+  root.append(
+    el(
+      'p',
+      '赤い行は削除・変更される部分、緑の行は追加・変更案です。左は編集欄にある公開予定の本文です。',
+      'hint',
+    ),
+  );
+  const firstLine = manualProposal.text.split('\n').find((line) => line.trim());
+  if (firstLine && /^#\s/.test(firstLine))
+    root.append(
+      el(
+        'p',
+        '1行目がタイトル（# 〜）になっています。本文に不要な場合は、採用後に編集欄で削除してください。',
+        'manual-proposal-warning',
+      ),
+    );
+  root.append(
+    BeautyArticleDiff.render(document, before, manualProposal.text, [
+      '公開予定の本文',
+      '読み込んだ修正案',
+    ]),
+  );
+  if (current.status !== 'pending_review')
+    root.append(
+      el(
+        'p',
+        '公開中の記事に採用するには、先に「この記事を編集する」で改訂を始めてください。',
+        'hint',
+      ),
+    );
+  const tools = el('div', undefined, 'tools');
+  for (const [decision, label] of [
+    ['accepted', '変更を採用する'],
+    ['declined', '変更しない'],
+  ]) {
+    const button = el(
+      'button',
+      label,
+      decision === 'declined' ? 'secondary' : undefined,
+    );
+    button.type = 'button';
+    button.dataset.manualDecision = decision;
+    button.onclick = () => decideManualProposal(decision);
+    tools.append(button);
+  }
+  root.append(tools);
+  updateActions();
+}
+function decideManualProposal(decision) {
+  if (busy || !manualProposal || !current) return;
+  if (decision === 'declined') {
+    resetManualProposal();
+    $('manual-proposal-message').textContent =
+      '修正案を取り消しました。本文は変更していません。';
+    return;
+  }
+  if (current.status !== 'pending_review' || manualProposal.articleId !== current.id)
+    return;
+  const body = $('editor').elements.body_markdown;
+  if (body.value !== manualProposal.before) {
+    renderManualProposal();
+    $('manual-proposal-message').textContent =
+      '比較した後に本文が変わりました。最新の本文で比較し直したので、もう一度確認してください。';
+    return;
+  }
+  if (
+    !confirm(
+      '編集欄の本文を、読み込んだ修正案に置き換えます。「修正を保存」を押すまで記事には反映されず、公開には別途承認が必要です。置き換えますか？',
+    )
+  )
+    return;
+  body.value = manualProposal.text;
+  resetManualProposal();
+  markDirty();
+  switchPanel('edit');
+  $('manual-proposal-message').textContent = '';
+  $('message').textContent =
+    '本文を修正案に置き換えました。内容を確認して「修正を保存」を押してください。公開は別途承認が必要です。';
+}
+$('manual-proposal-compare').onclick = () =>
+  action(async () => {
+    if (!current) throw new Error('先に記事を選んでください。');
+    const file = $('manual-proposal-file').files?.[0];
+    const pasted = $('manual-proposal-text').value;
+    if (file && pasted.trim())
+      throw new Error(
+        'ファイルと貼り付けの両方が入っています。どちらか一方にしてください。',
+      );
+    let text, label;
+    if (file) {
+      text = await readProposalFile(file);
+      label = file.name;
+    } else if (pasted.trim()) {
+      text = pasted;
+      label = '貼り付けた本文';
+    } else
+      throw new Error(
+        '修正案のファイルを選ぶか、本文を貼り付けてください。',
+      );
+    text = normalizeProposal(text);
+    if (text.trim().length < 40)
+      throw new Error('修正案の本文が短すぎます。40文字以上にしてください。');
+    if (text.length > 50000)
+      throw new Error('修正案の本文が50,000文字を超えています。');
+    manualProposal = { articleId: current.id, text, label, before: '' };
+    $('manual-proposal-message').textContent = '';
+    renderManualProposal();
+    return '修正案を読み込みました。左右の内容を確認してください。';
+  });
+$('manual-proposal-clear').onclick = () => {
+  if (busy) return;
+  resetManualProposal();
+  $('manual-proposal-message').textContent = '読み込みを取り消しました。';
 };
 window.addEventListener('beforeunload', (e) => {
   if (dirty) e.preventDefault();

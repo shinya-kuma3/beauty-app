@@ -378,6 +378,55 @@ test('Botは公開・管理画面にアクセスできず、認証が必要', as
     400,
   );
 });
+test('公開ページのプレビューは公開サイトと同じ表示規則で、論文リンクを出さず認証が必要', async () => {
+  const e = env();
+  const body = {
+    body_markdown:
+      '## 見出し\n[Xの投稿](https://x.com/beauty/status/1)と[論文](https://pubmed.ncbi.nlm.nih.gov/1/)を参考にしました。\n<script>alert(1)</script>',
+    citations: [
+      'https://www.youtube.com/watch?v=abc',
+      'https://pubmed.ncbi.nlm.nih.gov/1/',
+      'http://example.org/plain',
+      'not a url',
+    ],
+  };
+  assert.equal(
+    (await request(e, '/api/admin/public-preview', 'POST', body)).response
+      .status,
+    403,
+  );
+  const { response, data } = await request(
+    e,
+    '/api/admin/public-preview',
+    'POST',
+    body,
+    true,
+  );
+  assert.equal(response.status, 200);
+  assert.match(data.body_html, /<h2>見出し<\/h2>/);
+  assert.match(data.body_html, /href="https:\/\/x\.com\/beauty\/status\/1"/);
+  assert.ok(!data.body_html.includes('pubmed'));
+  assert.match(data.body_html, /論文/);
+  assert.ok(!data.body_html.includes('<script>'));
+  assert.deepEqual(
+    data.references.map((ref) => ref.url),
+    ['https://www.youtube.com/watch?v=abc'],
+  );
+  assert.equal(data.hidden_references, 3);
+  assert.equal(data.reading_minutes, 1);
+  assert.equal(
+    (
+      await request(
+        e,
+        '/api/admin/public-preview',
+        'POST',
+        { body_markdown: 'x'.repeat(50001) },
+        true,
+      )
+    ).response.status,
+    400,
+  );
+});
 test('参考リンク・編集メモは任意、URL重複と不正な入力を拒否', async () => {
   const e = env(),
     s = await request(e, '/api/ingest/sources', 'POST', source);

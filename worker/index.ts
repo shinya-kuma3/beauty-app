@@ -46,8 +46,10 @@ import {
   decode,
   rateLimit,
   renderMarkdown,
+  renderPublicMarkdown,
   reviewFlags,
 } from './core.mjs';
+import { isScientificReference } from '../shared/editorial-policy.mjs';
 import { settings, tags } from './config.mjs';
 import { runJobs } from './ai.mjs';
 import { discoverVideos } from './youtube.mjs';
@@ -364,6 +366,41 @@ app.post('/api/admin/preview', async (c) => {
     await json(c),
   );
   return c.json({ preview_html: renderMarkdown(data.body_markdown) });
+});
+// Public-page preview: same Markdown renderer and reference policy as the static site.
+app.post('/api/admin/public-preview', async (c) => {
+  const data = parse(
+    z
+      .object({
+        body_markdown: z.string().max(50000),
+        citations: z.array(z.string().max(2048)).max(20).default([]),
+      })
+      .strict(),
+    await json(c),
+  );
+  const references: { title: string; url: string; kind: string }[] = [];
+  let hidden = 0;
+  for (const value of data.citations) {
+    let url: URL;
+    try {
+      url = new URL(value.trim());
+    } catch {
+      hidden++;
+      continue;
+    }
+    const source = { title: url.hostname, url: url.href, kind: 'reference' };
+    if (url.protocol !== 'https:' || isScientificReference(source)) hidden++;
+    else references.push(source);
+  }
+  return c.json({
+    body_html: renderPublicMarkdown(data.body_markdown),
+    references,
+    hidden_references: hidden,
+    reading_minutes: Math.min(
+      60,
+      Math.max(1, Math.ceil(data.body_markdown.length / 500)),
+    ),
+  });
 });
 
 app.get('/admin', (c) => {
