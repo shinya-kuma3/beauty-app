@@ -31,10 +31,19 @@ jobs:
           node-version: '24'
           cache: npm
       - run: npm ci
+      # Protected develop/main accept these commits only from the release GitHub App (ruleset bypass).
+      # Until the App is configured, the default token keeps publication working as before.
+      - name: Create release App token
+        id: app-token
+        if: vars.RELEASE_APP_ID != ''
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ vars.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
       - name: Sync, check and publish approved articles
         run: npm run publish:content
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token || secrets.GITHUB_TOKEN }}
           RELEASE_API_KEY: ${{ secrets.RELEASE_API_KEY }}
           CLOUDFLARE_PRODUCTION_DEPLOY_HOOK: ${{ secrets.CLOUDFLARE_PRODUCTION_DEPLOY_HOOK }}
           CONTENT_RELEASE_API_URL: ${{ vars.CONTENT_RELEASE_API_URL }}
