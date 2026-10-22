@@ -9,6 +9,7 @@ import {
   rm,
 } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
+import { generateKeyPairSync } from 'node:crypto';
 import { join } from 'node:path';
 import { generateKeyPair, exportJWK, SignJWT } from 'jose';
 import worker, { app } from '../worker/index.ts';
@@ -1564,10 +1565,11 @@ async function releaseRequest(e, path, method = 'GET', body) {
   );
   return { response, data: await response.json() };
 }
-async function releaseFixture() {
+async function releaseFixture(overrides = {}) {
   const e = env({
       RELEASE_API_KEY: 'test-release-key',
       CONTENT_DELIVERY_MODE: 'github',
+      ...overrides,
     }),
     id = await submitted(e);
   await processAll(e);
@@ -1600,6 +1602,48 @@ async function releaseFixture() {
   assert.equal(started.response.status, 200);
   return { e, id, file, started: started.data, body };
 }
+test('公開承認とGrokの合格で、承認記事の公開ワークフローをすぐに呼び出す', async () => {
+  const pem = generateKeyPairSync('rsa', { modulusLength: 2048 }).privateKey.export({
+    type: 'pkcs1',
+    format: 'pem',
+  });
+  const dispatches = [];
+  const previous = globalThis.fetch;
+  globalThis.fetch = async (input, options = {}) => {
+    const url = String(input);
+    if (!url.startsWith('https://api.github.com/')) return previous(input, options);
+    if (url.endsWith('/repos/owner/beauty-app/installation'))
+      return Response.json({ id: 42 });
+    if (url.endsWith('/app/installations/42/access_tokens'))
+      return Response.json({ token: 'installation-token' }, { status: 201 });
+    if (url.endsWith('/actions/workflows/content-release.yml/dispatches')) {
+      dispatches.push(JSON.parse(options.body));
+      return new Response(null, { status: 204 });
+    }
+    return Response.json({}, { status: 404 });
+  };
+  try {
+    const f = await releaseFixture({
+      GITHUB_DISPATCH_APP_ID: '123',
+      GITHUB_DISPATCH_REPOSITORY: 'owner/beauty-app',
+      GITHUB_DISPATCH_PRIVATE_KEY: pem,
+    });
+    assert.deepEqual(dispatches, [{ ref: 'main' }]);
+    const result = await request(
+      f.e,
+      '/api/ingest/releases/' + f.started.id + '/result',
+      'POST',
+      releasePass(f),
+    );
+    assert.equal(result.response.status, 200);
+    assert.equal(result.data.state, 'approved');
+    assert.equal(dispatches.length, 2);
+  } finally {
+    globalThis.fetch = previous;
+  }
+  const quiet = await releaseFixture();
+  assert.equal(quiet.started.state, 'pending');
+});
 function releasePass(f) {
   return {
     digest: f.started.digest,

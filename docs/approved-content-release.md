@@ -103,3 +103,20 @@ Grok待ちではwaiting_grok、指摘ありはblockedと表示し、mainを変�
 差分同期は1回最大20件、本番確認は最大5記事です。mainへのpush後にHookが失敗した場合も、次回に未完了のビルドを再試行します。承認済み記事の削除や、記事以外のコード変更の本番公開は自動では行いません。
 
 参考：[GitHubのWorkflow実行条件](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/trigger-a-workflow)、[Cloudflare Deploy Hooks](https://developers.cloudflare.com/workers/ci-cd/builds/deploy-hooks/)。GitHub_TOKENによるpushは他のActionsのpushイベントを発火させないため、このWorkflow内で必要な検証と本番Hookを明示的に実行します。
+
+## 公開ワークフローの即時呼び出し（2026-10-23）
+
+GitHub の定期実行（15分ごと）は混雑時に数時間遅れることがあるため、管理Worker が次の操作の直後に「Approved article publication」（content-release.yml、ref=main）を workflow_dispatch で呼び出す。定期実行は取りこぼし時の保険として残す。
+
+- 編集者・管理者が記事の公開を承認したとき（reason=approved）
+- Grok の本番差分確認が pass で、依頼が approved になったとき（grok_passed）
+- 公開記事の非公開を依頼したとき（withdrawal）
+- 管理者が公開反映を再試行したとき（retry）
+
+呼び出しは CONTENT_DELIVERY_MODE=github で、次の設定がそろっている場合だけ行う。応答の後に実行し（waitUntil）、失敗しても承認などの操作は取り消さない。失敗時はログに publication_dispatch_failed と原因コードだけを出す。
+
+- GITHUB_DISPATCH_REPOSITORY（変数）：`shinya-kuma3/beauty-app`
+- GITHUB_DISPATCH_APP_ID（変数）：自動公開用 GitHub App の App ID
+- GITHUB_DISPATCH_PRIVATE_KEY（シークレット）：同じ App の秘密鍵（PKCS#1 の .pem のまま可）。GitHub Actions 用とは別に、App で新しい鍵を発行して登録する。
+
+App には Repository permissions の「Actions: Read and write」を追加する（Contents: Read and write は自動公開のため維持）。権限の追加後、App のインストール画面で新しい権限を承認する。Worker は App の JWT（RS256、有効10分）でインストールトークンを取り、`actions: write` だけに絞って対象リポジトリのワークフローを呼び出す。

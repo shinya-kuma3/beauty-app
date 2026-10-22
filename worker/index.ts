@@ -4,6 +4,7 @@ import { billingOverview, importCursor, syncCloudflare } from './billing.mjs';
 import {publications,requestWithdrawal,withdrawalManifest,markWithdrawalBuild} from './withdrawals.mjs';
 import { allowedOrigin, submitFeedback, listFeedback } from './feedback.mjs';
 import { siteAnalytics, pageAnalytics } from './analytics.mjs';
+import { dispatchPublication } from './github-dispatch.mjs';
 import {
   approvedFiles,
   requestRelease,
@@ -67,6 +68,17 @@ const app = new Hono<{
   Variables: { admin: string; role: string };
 }>();
 const jwks = new Map<string, ReturnType<typeof createRemoteJWKSet>>();
+// Runs a task after the response when the runtime allows it (Workers); otherwise waits for it.
+async function inBackground(c: any, task: Promise<unknown>) {
+  let ctx: any = null;
+  try {
+    ctx = c.executionCtx;
+  } catch {
+    ctx = null;
+  }
+  if (ctx?.waitUntil) ctx.waitUntil(task);
+  else await task;
+}
 async function json(c: any, limit = 262144) {
   if (!c.req.header('Content-Type')?.startsWith('application/json'))
     throw new ApiError(415, 'json_required');
@@ -290,7 +302,11 @@ app.delete("/api/admin/feedback/:id", async (c) => {
 });
 app.post('/api/admin/publications/edit',async(c)=>c.json(await editPublication(c.env,await json(c,5000),c.get('admin'))));
 app.get('/api/admin/publications',async(c)=>c.json(await publications(c.env,c.req.query())));
-app.post('/api/admin/publications/withdraw',async(c)=>c.json(await requestWithdrawal(c.env,await json(c,5000),c.get('admin')),201));
+app.post('/api/admin/publications/withdraw',async(c)=>{
+  const result=await requestWithdrawal(c.env,await json(c,5000),c.get('admin'));
+  await inBackground(c,dispatchPublication(c.env,'withdrawal'));
+  return c.json(result,201);
+});
 app.get('/api/admin/analytics', async (c) =>
   c.json(await siteAnalytics(c.env, c.req.query(), c.get('role'))),
 );
@@ -890,6 +906,8 @@ app.post('/api/admin/articles/:id/review', async (c) => {
     body.status === 'published'
       ? await triggerBuild(c.env, { id: publicationId })
       : null;
+  if (body.status === 'published')
+    await inBackground(c, dispatchPublication(c.env, 'approved'));
   return c.json({ id, status: body.status, publication });
 });
 app.post('/api/admin/articles/:id/retry-build', async (c) => {
@@ -900,7 +918,9 @@ app.post('/api/admin/articles/:id/retry-build', async (c) => {
     .bind(c.req.param('id'))
     .first();
   if (!job) throw new ApiError(404, 'publication_not_pending');
-  return c.json(await triggerBuild(c.env, job));
+  const result = await triggerBuild(c.env, job);
+  await inBackground(c, dispatchPublication(c.env, 'retry'));
+  return c.json(result);
 });
 app.post('/api/admin/jobs/run', async (c) =>
   c.json({ jobs: await runJobs(c.env) }),
@@ -1037,9 +1057,13 @@ app.post('/api/release/requests/:id/build', async (c) =>
 app.get('/api/ingest/releases', async (c) =>
   c.json(await pendingReleases(c.env)),
 );
-app.post('/api/ingest/releases/:id/result', async (c) =>
-  c.json(await completeRelease(c.env, c.req.param('id'), await json(c))),
-);
+app.post('/api/ingest/releases/:id/result', async (c) => {
+  const result = await completeRelease(c.env, c.req.param('id'), await json(c));
+  // A Grok pass is the last step before main; start publication now instead of waiting.
+  if (result.state === 'approved')
+    await inBackground(c, dispatchPublication(c.env, 'grok_passed'));
+  return c.json(result);
+});
 app.get('/api/published/export', async (c) => {
   if (
     !(await secureEqual(
