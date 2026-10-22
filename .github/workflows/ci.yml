@@ -1,12 +1,24 @@
 name: Content and site checks
 on:
-  push:
   pull_request:
+    branches: [develop, main]
+  push:
+    branches: [develop, main]
+    # Approved-article commits are verified by the publication workflow itself.
+    paths-ignore:
+      - 'src/content/approved-articles/**'
+      - 'src/content/withdrawn-articles.json'
+  workflow_dispatch:
 permissions:
   contents: read
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
+  # The job name "verify" is the required status check for develop and main.
   verify:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
