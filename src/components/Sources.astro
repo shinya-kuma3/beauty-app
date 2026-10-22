@@ -4,4 +4,4 @@ interface Props { sources?: { title: string; url: string; kind: string }[]; }
 const sources = publicReferences(Astro.props.sources || []);
 const labels: Record<string, string> = { official: '公式サイト', x: 'X の投稿', youtube: 'YouTube の動画', reference: '参考にした情報' };
 ---
-{sources.length > 0 && <aside class="sources" aria-label="参考にした投稿・動画"><h2>参考にした投稿・動画</h2><ul>{sources.map((source) => <li><a href={source.url} target="_blank" rel="noopener noreferrer">{source.title} ↗</a><small>{labels[source.kind] || '参考にした情報'} · 外部サイトを開きます</small></li>)}</ul></aside>}
+{sources.length > 0 && <aside class="sources" aria-label="参考にした投稿・動画"><details class="sources-accordion"><summary><h2>参考にした投稿・動画</h2><span class="sources-count">{sources.length}件</span></summary><ul>{sources.map((source) => <li><a href={source.url} target="_blank" rel="noopener noreferrer">{source.title} ↗</a><small>{labels[source.kind] || '参考にした情報'} · 外部サイトを開きます</small></li>)}</ul><p class="sources-caution">※ 投稿・動画は、投稿者による削除や非公開への変更などにより、リンク先を表示できない場合があります。</p></details></aside>}

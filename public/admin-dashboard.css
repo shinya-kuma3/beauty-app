@@ -700,11 +700,16 @@ button.danger:focus-visible {
 .pp-meta{display:flex;gap:15px;flex-wrap:wrap;font-size:11px;color:#627a8c;margin-top:16px}
 .pp-excerpt{color:#627a8c;font-size:14px;line-height:2;margin:18px 0 0}
 .pp-tags{display:flex;gap:8px;flex-wrap:wrap;margin-top:18px}.pp-tags span{font-size:10px;padding:7px 11px;background:#edf6fc;border-radius:3px;color:#1d577d}
-.pp-note{background:#f1f7fb;border-left:3px solid #8bb6d1;padding:18px 20px;margin-top:28px}.pp-note p{font-size:12px;color:#627a8c;margin:0}
+.pp-note{background:#f1f7fb;border-left:3px solid #8bb6d1;padding:18px 20px;margin-top:36px}.pp-note p{font-size:12px;color:#627a8c;margin:0}
 .pp-body{padding-top:20px;font-size:14px;line-height:2.1}
 .pp-body h2{font-family:'Noto Serif JP','Yu Mincho',serif;font-weight:500;font-size:24px;line-height:1.65;letter-spacing:.06em;margin:34px 0 15px}
 .pp-body h3{font-size:18px;font-weight:500;margin:26px 0 10px}.pp-body a{color:#236a98;text-decoration:underline;text-underline-offset:4px}
-.pp-sources{margin-top:40px;border-top:1px solid #dfebf2;padding-top:24px}.pp-sources h2{font-family:'Noto Serif JP','Yu Mincho',serif;font-weight:500;font-size:20px;margin:0 0 14px}
+.pp-header{display:block;padding:0 0 28px;background:none;border-bottom:1px solid #dfebf2}
+.pp-sources{margin-top:40px;border-top:1px solid #dfebf2;padding-top:24px}.pp-sources h2{font-family:'Noto Serif JP','Yu Mincho',serif;font-weight:500;font-size:20px;margin:0}
+.pp-sources-accordion{margin:0}.pp-sources-accordion summary{display:flex;align-items:center;gap:12px;cursor:pointer;list-style:none;padding:4px 0;background:none;box-shadow:none}.pp-sources-accordion summary::-webkit-details-marker{display:none}
+.pp-sources-accordion summary:after{content:'';width:8px;height:8px;margin-left:auto;margin-right:4px;border-right:1.5px solid #236a98;border-bottom:1.5px solid #236a98;transform:rotate(45deg);transition:transform .2s ease}.pp-sources-accordion[open] summary:after{transform:rotate(-135deg)}
+.pp-sources-count{font-size:11px;color:#627a8c;background:#edf6fc;border-radius:20px;padding:3px 10px}.pp-sources-accordion ul{margin-top:16px}.pp-sources-caution{font-size:11px;color:#627a8c;line-height:1.8;margin:6px 0 0}
+@media(prefers-reduced-motion:reduce){.pp-sources-accordion summary:after{transition:none}}
 .pp-sources ul{padding-left:20px;margin:0}.pp-sources li{font-size:12px;color:#627a8c;line-height:1.9;margin-bottom:12px}.pp-sources a{color:#236a98;text-decoration:underline;text-underline-offset:4px}.pp-sources small{font-size:10px;display:block}
 .pp-hidden{margin-top:20px}
 @media(max-width:760px){.manual-proposal-inputs{grid-template-columns:1fr}.public-preview{padding:24px 16px 32px}.public-preview h1{font-size:24px}.preview-dialog-bar{padding:14px 16px}}
